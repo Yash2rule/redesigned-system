@@ -1,0 +1,298 @@
+# HANDOFF.md
+
+Everything that needs you. In order. Nothing else was left for you — design,
+copy, schema, naming, pricing, sample data and tests are all done and
+committed.
+
+**Deployment status: not deployed.** No Vercel, Supabase or Neon credentials
+existed in the build environment, so there are no preview URLs to record. The
+repo is deploy-ready and item 3 below is a 15-minute job.
+
+Before anything else, prove it runs on your machine:
+
+```bash
+pnpm install
+pnpm build          # 5 apps, ~60s cold
+pnpm test           # 168 tests, ~3s
+cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
+```
+
+It will work with a completely empty `.env`. That is deliberate: every probe
+produces its full, real result with zero credentials. Each item below turns on
+one more thing.
+
+---
+
+## 1. Database — Supabase or Neon
+
+**Why:** Without `DATABASE_URL` every app writes its funnel data to local JSON
+files. On Vercel that means each serverless instance keeps its own copy and a
+redeploy loses all of it — which destroys the only thing these probes exist to
+produce. It also means the admin dashboard cannot see the apps' data at all,
+because they are five separate deployments.
+
+This is the single most important item. Do it before you send anyone a link.
+
+```
+https://supabase.com/dashboard  →  new project  →  Settings → Database
+  → Connection string → URI  (use the pooled "Transaction" one, port 6543)
+```
+or
+```
+https://console.neon.tech  →  new project  →  copy the pooled connection string
+```
+
+Set the **same** `DATABASE_URL` on all five Vercel projects. Tables create
+themselves on first request — there is no migration step to run.
+
+Verify: open `<any-app>/api/health` and check `"database": true`.
+
+---
+
+## 2. Admin password
+
+**Why:** The dashboard refuses to serve anything until `ADMIN_PASSWORD` is set,
+and it should — the funnel data includes the email address of every person who
+asked to be told when payments open.
+
+```bash
+openssl rand -base64 24
+```
+
+Set it as `ADMIN_PASSWORD` on the `admin` project only. Minimum 8 characters.
+
+---
+
+## 3. Vercel projects
+
+**Why:** Nothing is deployed. Five projects, one per app, each independently
+deployable from this monorepo.
+
+```bash
+npm i -g vercel && vercel login
+pnpm deploy:all          # preview URLs
+pnpm deploy:all -- --prod
+```
+
+The script prompts once per app to link a project — give each a distinct name.
+Each app already has a `vercel.json` with the right build command and region
+(Mumbai for the three rupee-priced probes, US East for the dollar-priced one).
+
+After deploying, set `DATABASE_URL` (item 1) on every project and
+`ADMIN_PASSWORD` (item 2) on admin, then redeploy.
+
+**Record the URLs here when you have them:**
+
+| App | Preview URL | Production URL |
+| --- | --- | --- |
+| offer-decoder | | |
+| ledger | | |
+| uptime | | |
+| freelancer-kit | | |
+| admin | | |
+
+---
+
+## 4. Payment keys
+
+**Why:** Until these exist, every buy button records purchase intent and tells
+the visitor plainly that payments are not open. That is honest and it still
+measures something — but `paid` will read zero on the dashboard for every
+probe, so it cannot rank anything.
+
+Do this **after** you know which probe is winning, not before. One rail is
+enough to start.
+
+**Razorpay (INR — offer-decoder, ledger, freelancer-kit)**
+```
+https://dashboard.razorpay.com/app/website-app-settings/api-keys
+```
+Set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`. Start with the `rzp_test_`
+keys. No code change needed — the button switches itself the moment the keys
+are present.
+
+**Lemon Squeezy (USD — uptime)**
+```
+API key:  https://app.lemonsqueezy.com/settings/api
+Store ID: https://app.lemonsqueezy.com/settings/stores
+```
+Set `LEMONSQUEEZY_API_KEY` and `LEMONSQUEEZY_STORE_ID`. You must **also** create
+a product variant per plan and paste each numeric variant id into the
+`providerRef` field of the matching plan in `apps/uptime/lib/config.ts`. Without
+it checkout returns a clear error instead of a broken payment page.
+
+Lemon Squeezy is the USD rail specifically because they act as merchant of
+record and handle US/EU sales tax, which you cannot register for.
+
+---
+
+## 5. Domains and DNS
+
+**Why:** Four probes on `*.vercel.app` look like four side projects. On their
+own domains they look like four products, and the difference shows up in the
+conversion numbers you are trying to read.
+
+Suggested names, all currently placeholders in the code:
+
+| Probe | Placeholder domain | Where it appears |
+| --- | --- | --- |
+| offer-decoder | `offerdecoder.in` | `apps/offer-decoder/lib/config.ts` (`contactEmail`) |
+| ledger | `statementledger.in` | `apps/ledger/lib/config.ts` |
+| uptime | `clientwatch.dev` | `apps/uptime/lib/config.ts` |
+| freelancer-kit | `freelancedesk.in` | `apps/freelancer-kit/lib/config.ts` |
+
+Buy at any registrar, add to the Vercel project, follow Vercel's DNS
+instructions. Then set `APP_BASE_URL` per project.
+
+**Do not skip the email addresses.** They are in every footer, every FAQ, and
+in the support widget's "I don't know, email us" fallback. An unread address
+there is the one dishonest thing in an otherwise honest product.
+
+---
+
+## 6. AI key (optional)
+
+**Why:** Genuinely optional. Every probe produces its complete result with no
+model. The LLM is an enrichment layer over deterministic logic, never the
+engine. With a key, the support widget rephrases FAQ answers instead of
+returning them verbatim — that is the whole difference today.
+
+```
+https://console.anthropic.com/settings/keys
+```
+Set `ANTHROPIC_API_KEY`. `OPENAI_API_KEY` and `GEMINI_API_KEY` work too; the
+provider abstraction picks the first key it finds unless `LLM_PROVIDER` says
+otherwise.
+
+Leave it unset until a probe is winning. It is a running cost with no
+validation value.
+
+---
+
+## 7. Analytics and email (optional)
+
+**PostHog** — `POSTHOG_KEY` from https://app.posthog.com/settings/project.
+Events go to your database regardless; PostHog is a mirror, not the source of
+truth. The admin dashboard reads the database. Add it if you want funnels and
+session replay you did not have to build.
+
+**Resend** — `RESEND_API_KEY` from https://resend.com/api-keys, plus
+`AUTH_FROM_EMAIL` and an `AUTH_SECRET` of at least 16 characters. Only needed
+for magic-link sign-in, which is optional by design: every probe produces its
+first result with no account at all. You will need it eventually to email the
+people who left an address.
+
+---
+
+## 8. A chartered accountant, for the freelancer kit
+
+**Why:** `apps/freelancer-kit` generates GST invoices. The rules are
+implemented from the particulars Rule 46 requires and are covered by 36 tests —
+but tested is not the same as reviewed, and this is the one probe where being
+wrong costs a user real money and real credibility with their client's accounts
+team.
+
+Have a CA check one invoice of each of these four shapes before you describe it
+publicly as GST-compliant:
+
+1. Intra-state (supplier and client in the same state → CGST + SGST)
+2. Inter-state (different states → single IGST)
+3. Unregistered supplier (no GSTIN → no tax at all, plain invoice)
+4. Export of services under LUT (zero-rated)
+
+Generate all four from the deployed app and send the PDFs. It is one hour of
+someone's time.
+
+**Also worth one lawyer-hour:** the contract template in
+`apps/freelancer-kit/lib/contract.ts`. It says on its face that it has not been
+reviewed, which is honest. One review would let you soften that to "reviewed
+once, not for your situation" — more useful, and still true.
+
+---
+
+## 9. Two claims I could not verify from this machine
+
+Both are in the code and both are tested against recorded or local data. Neither
+could be confirmed against the live internet, because outbound requests from the
+build environment go through a filtering proxy that returns 403 for most hosts
+and terminates TLS with its own certificate.
+
+**a. RDAP domain expiry (`apps/uptime`).** `https://rdap.org` returned 403 from
+here. The parsing is tested against realistic RDAP payloads, and the failure
+path (registry does not publish expiry → report "unknown") is tested. But
+**before you post the uptime launch content, run one live check against a real
+domain and confirm a real expiry date comes back.** The launch post claims this
+works. If it does not, the fix is likely a different RDAP base — set
+`RDAP_BASE_URL` to a registry endpoint directly.
+
+**b. Live TLS against real hosts.** Certificate reading is tested against local
+HTTPS servers with three generated certificates (valid, near-expiry,
+wrong-hostname), and a raw handshake to a real host worked from a plain node
+process. Inside the app the proxy substituted its own certificate, so the
+end-to-end path against the public internet is unproven. Run one check against
+a domain whose expiry date you know.
+
+Neither is a suspected bug. Both are unverified, and I would rather say so.
+
+---
+
+## 10. Posting the launch content
+
+Each probe has a `LAUNCH.md` with three ready-to-post pieces and a
+"before you post" checklist. In order of what I would actually do:
+
+1. **freelancer-kit** — but only after item 8. Sharpest hook (the 44ADA
+   single-instalment rule), most defensible claim, clearest audience.
+2. **offer-decoder** — biggest audience, easiest to explain in five seconds.
+   Post to r/developersIndia when you can sit with the thread for two hours.
+3. **ledger** — the Show HN is the strongest piece of writing of the eight,
+   because the parsing problem is genuinely interesting to that audience.
+4. **uptime** — after item 9a.
+
+Do not post all four in one week. You will not be able to tell which signal came
+from which product, which is the entire point of running them in parallel.
+
+---
+
+## 11. Things I did not finish, and exactly where I stopped
+
+**Scheduled re-checks for the uptime probe.** The paid plans describe daily and
+hourly checks. There is no scheduler. The free manual check is complete and the
+copy is careful to describe it as point-in-time, so nothing currently on the
+site is untrue — but do not add "monitoring" to the marketing until this
+exists. Where to start: a `/api/cron/check` route that re-runs `runChecks` over
+stored monitors, plus a `crons` entry in `apps/uptime/vercel.json`. Vercel Hobby
+allows one cron per day; hourly needs Pro or an external pinger.
+
+**Probe 2 (LLM prompt regression testing) was not built.** I swapped it for
+probe 7; the reasoning is in `DECISIONS.md` §3. Short version: without a model
+key it cannot show a stranger a real result, so its funnel would have measured
+curiosity and would not have been comparable against the other three. If you
+disagree, it is the cheapest one to add — it needs the LLM abstraction in
+`packages/core/src/llm` (already built and used) plus a bring-your-own-key form.
+
+**Magic-link auth is built but unused.** `packages/auth` works and is tested by
+inspection, not by a test file. No probe calls it, because every probe
+deliberately works anonymously for the first result. It is there for when you
+need saved history.
+
+**The offer-decoder comparison benchmark shows nothing yet.** By design: it
+needs eight real contributed offers before it will show a comparison, and says
+so plainly until then. Do not seed it. Seeded benchmark data would be exactly
+the kind of lie that is only ever told to oneself.
+
+**`paid` will read zero on the dashboard** until item 4. The dashboard says
+this on the page and ranks on result-to-email instead. Switch the ranking to
+`paid` once a rail is live — it is one comparator in
+`apps/admin/app/page.tsx`.
+
+**No rate limiting anywhere.** Fine at zero traffic; the uptime probe is the
+one that would hurt if abused, since it makes outbound requests. The SSRF guard
+is thorough (see `apps/uptime/lib/safe-url.ts` and its 19 tests) but it does not
+stop someone using you to make many requests to one victim. If that probe gets
+traffic, add a per-IP limit before anything else.
+
+**Income tax slabs are hardcoded for FY 2025-26.** One file,
+`packages/core/src/india/tax.ts`, with the year attached, and every result page
+states which year it used. It needs a yearly edit after each Budget. That is
+better than a silently wrong answer.
