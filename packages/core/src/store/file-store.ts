@@ -254,6 +254,14 @@ export class FileStore implements Store {
       .slice(0, limit);
   }
 
+  async listCorpus(probe: ProbeId, kind: string | null, limit: number): Promise<CorpusRow[]> {
+    await this.serial(() => this.load());
+    return this.memory.corpus
+      .filter((row) => row.probe === probe && (kind === null || row.kind === kind))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
+  }
+
   async corpusCounts(): Promise<Record<string, number>> {
     await this.serial(() => this.load());
     const out: Record<string, number> = Object.fromEntries(PROBES.map((p) => [p, 0]));

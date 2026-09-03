@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { getStore } from "@probes/core";
+import { getStore } from "@probes/core/server";
 import { LemonSqueezyAdapter } from "./lemonsqueezy.ts";
 import { RazorpayAdapter } from "./razorpay.ts";
 import type { BillingAdapter, CheckoutRequest, CheckoutResult, Plan } from "./types.ts";

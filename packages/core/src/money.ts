@@ -59,19 +59,19 @@ export function parseIndianAmount(input: string): number | null {
     .toLowerCase();
   if (!cleaned) return null;
 
-  const match = cleaned.match(/^(-?\d+(?:\.\d+)?)(cr|crore|crores|l|lac|lakh|lakhs|k|th)?/);
+  // Longest alternatives first: "lpa" must win over "l", or "32 LPA" parses
+  // as thirty-two rupees.
+  const match = cleaned.match(
+    /^(-?\d+(?:\.\d+)?)\s*(crores|crore|cr|lakhs|lakh|lacs|lac|lpa|l|k|th)?/,
+  );
   if (!match?.[1]) return null;
   const value = Number(match[1]);
   if (!Number.isFinite(value)) return null;
 
   const unit = match[2] ?? "";
-  const multiplier =
-    unit === "cr" || unit === "crore" || unit === "crores"
-      ? 1e7
-      : unit === "l" || unit === "lac" || unit === "lakh" || unit === "lakhs"
-        ? 1e5
-        : unit === "k" || unit === "th"
-          ? 1e3
-          : 1;
+  const CRORE = new Set(["cr", "crore", "crores"]);
+  const LAKH = new Set(["l", "lac", "lacs", "lakh", "lakhs", "lpa"]);
+  const THOUSAND = new Set(["k", "th"]);
+  const multiplier = CRORE.has(unit) ? 1e7 : LAKH.has(unit) ? 1e5 : THOUSAND.has(unit) ? 1e3 : 1;
   return Math.round(value * multiplier * 100);
 }

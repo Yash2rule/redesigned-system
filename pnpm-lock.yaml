@@ -8,6 +8,18 @@ importers:
 
   .:
     devDependencies:
+      '@probes/analytics':
+        specifier: workspace:*
+        version: link:packages/analytics
+      '@probes/app-kit':
+        specifier: workspace:*
+        version: link:packages/app-kit
+      '@probes/billing':
+        specifier: workspace:*
+        version: link:packages/billing
+      '@probes/core':
+        specifier: workspace:*
+        version: link:packages/core
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.1
@@ -32,6 +44,9 @@ importers:
       '@probes/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@probes/app-kit':
+        specifier: workspace:*
+        version: link:../../packages/app-kit
       '@probes/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -66,6 +81,9 @@ importers:
       '@probes/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@probes/app-kit':
+        specifier: workspace:*
+        version: link:../../packages/app-kit
       '@probes/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -100,6 +118,9 @@ importers:
       '@probes/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@probes/app-kit':
+        specifier: workspace:*
+        version: link:../../packages/app-kit
       '@probes/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -134,6 +155,9 @@ importers:
       '@probes/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@probes/app-kit':
+        specifier: workspace:*
+        version: link:../../packages/app-kit
       '@probes/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -168,6 +192,9 @@ importers:
       '@probes/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@probes/app-kit':
+        specifier: workspace:*
+        version: link:../../packages/app-kit
       '@probes/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -202,6 +229,24 @@ importers:
       '@probes/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/app-kit:
+    dependencies:
+      '@probes/analytics':
+        specifier: workspace:*
+        version: link:../analytics
+      '@probes/billing':
+        specifier: workspace:*
+        version: link:../billing
+      '@probes/core':
+        specifier: workspace:*
+        version: link:../core
+      '@probes/ui':
+        specifier: workspace:*
+        version: link:../ui
+      next:
+        specifier: ^16.0.0
+        version: 16.3.4(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
 
   packages/auth:
     dependencies:
@@ -263,6 +308,9 @@ importers:
       '@probes/core':
         specifier: workspace:*
         version: link:../core
+      next:
+        specifier: ^16.0.0
+        version: 16.3.4(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react:
         specifier: ^19.0.0
         version: 19.2.8

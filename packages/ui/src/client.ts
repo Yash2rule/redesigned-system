@@ -1,6 +1,6 @@
 "use client";
 
-import type { EventName } from "@probes/core";
+import type { EventName } from "@probes/core/types.ts";
 
 /**
  * Client-side event helper. Every probe's browser code calls exactly this.

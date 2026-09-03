@@ -1,4 +1,5 @@
-import type { Currency, ProbeId } from "@probes/core";
+import type { ProbeId } from "@probes/core/types.ts";
+import type { Currency } from "@probes/core/money.ts";
 
 export type Plan = {
   id: string;

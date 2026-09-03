@@ -1,4 +1,4 @@
-import type { ProbeId } from "@probes/core";
+import type { ProbeId } from "@probes/core/types.ts";
 import type { Plan } from "@probes/billing";
 
 export type Benefit = { title: string; body: string };

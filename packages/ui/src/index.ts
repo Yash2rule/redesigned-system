@@ -3,6 +3,7 @@ export { Hero, BenefitList } from "./components/hero.tsx";
 export { PricingBlock } from "./components/pricing.tsx";
 export { FaqSection } from "./components/faq.tsx";
 export { SiteFooter } from "./components/footer.tsx";
+export { ThanksPage, NotFoundPage } from "./components/thanks.tsx";
 export { SupportWidget } from "./components/support-widget.tsx";
 export { UploadWidget } from "./components/upload-widget.tsx";
 export type { UploadWidgetProps } from "./components/upload-widget.tsx";

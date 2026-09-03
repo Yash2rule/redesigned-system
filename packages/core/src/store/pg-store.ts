@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { EVENT_NAMES, PROBES, isEventName, isProbeId } from "../types.ts";
@@ -289,6 +289,26 @@ export class PgStore implements Store {
           ]
         : [],
     );
+  }
+
+  async listCorpus(probe: ProbeId, kind: string | null, limit: number): Promise<CorpusRow[]> {
+    await this.ready();
+    const where = kind === null ? eq(t.corpus.probe, probe) : and(eq(t.corpus.probe, probe), eq(t.corpus.kind, kind));
+    const rows = await this.db
+      .select()
+      .from(t.corpus)
+      .where(where)
+      .orderBy(desc(t.corpus.createdAt))
+      .limit(limit);
+    return rows.map((r) => ({
+      id: r.id,
+      probe,
+      kind: r.kind,
+      inputHash: r.inputHash,
+      input: r.input as Json,
+      output: r.output as Json,
+      createdAt: r.createdAt.toISOString(),
+    }));
   }
 
   async corpusCounts(): Promise<Record<string, number>> {

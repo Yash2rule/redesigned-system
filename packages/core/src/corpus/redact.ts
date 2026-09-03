@@ -39,8 +39,11 @@ const RULES: Rule[] = [
     replace: (m) => token("aadhaar", m),
   },
   {
+    // Indian mobiles are written a dozen ways: 9876543210, 98765 43210,
+    // +91 98765-43210, 09876543210. The digits are normalised before hashing
+    // so every spelling of one number maps to the same token.
     name: "phone",
-    pattern: /(?:\+91[-\s]?|\b0)?[6-9]\d{9}\b/g,
+    pattern: /(?:\+?91[\s-]?|\b0)?[6-9]\d{4}[\s-]?\d{5}\b/g,
     replace: (m) => token("phone", m.replace(/\D/g, "").slice(-10)),
   },
   {

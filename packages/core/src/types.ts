@@ -93,3 +93,31 @@ export type FunnelRow = {
   intents: number;
   intentValueMinor: number;
 };
+
+/**
+ * An error whose message is safe and useful to show a visitor verbatim.
+ *
+ * The default in `runProbeFlow` is to swallow the real message and show a
+ * generic apology, because parser stack traces are both useless and a little
+ * frightening. Probes throw this when they have something specific and
+ * actionable to say instead.
+ */
+export class UserFacingError extends Error {
+  readonly userFacing = true;
+  readonly status: number;
+
+  constructor(message: string, status = 422) {
+    super(message);
+    this.name = "UserFacingError";
+    this.status = status;
+  }
+}
+
+export function isUserFacingError(error: unknown): error is UserFacingError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { userFacing?: unknown }).userFacing === true &&
+    typeof (error as { message?: unknown }).message === "string"
+  );
+}

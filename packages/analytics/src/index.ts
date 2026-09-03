@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { env, getStore } from "@probes/core";
-import type { EventName, Json, ProbeId, SessionRow } from "@probes/core";
+import { env, getStore } from "@probes/core/server";
+import type { EventName, Json, ProbeId, SessionRow } from "@probes/core/types.ts";
 
 export type TrackInput = {
   probe: ProbeId;

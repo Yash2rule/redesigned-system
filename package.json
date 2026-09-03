@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@10.33.0",
-  "engines": { "node": ">=20.11" },
+  "engines": {
+    "node": ">=20.11"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -20,9 +22,18 @@
     "@types/react-dom": "^19.0.0",
     "turbo": "^2.10.12",
     "typescript": "5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@probes/core": "workspace:*",
+    "@probes/app-kit": "workspace:*",
+    "@probes/billing": "workspace:*",
+    "@probes/analytics": "workspace:*"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["sharp", "esbuild", "@tailwindcss/oxide", "unrs-resolver"]
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild",
+      "@tailwindcss/oxide",
+      "unrs-resolver"
+    ]
   }
 }

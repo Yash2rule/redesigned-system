@@ -35,4 +35,6 @@ export interface Store {
   recentIntents(limit: number): Promise<IntentRow[]>;
   /** Corpus size per probe — the "data moat" counter. */
   corpusCounts(): Promise<Record<string, number>>;
+  /** Anonymised corpus rows for a probe, newest first. Powers benchmarking. */
+  listCorpus(probe: ProbeId, kind: string | null, limit: number): Promise<CorpusRow[]>;
 }
