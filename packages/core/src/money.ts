@@ -36,13 +36,20 @@ export function formatMoney(minor: number, currency: Currency): string {
   return currency === "USD" ? formatUsd(minor) : formatInr(minor);
 }
 
+/**
+ * Trim trailing zeros from a fixed-decimal string: 12.50 -> 12.5, 12.00 -> 12.
+ * The dot in the pattern keeps "120" intact.
+ */
+const trimZeros = (value: string): string =>
+  value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+
 /** "₹12.5 L" / "₹1.2 Cr" — how Indians actually talk about salaries. */
 export function formatIndianShort(minor: number): string {
   const value = Math.abs(minor) / 100;
   const sign = minor < 0 ? "-" : "";
-  if (value >= 1e7) return `${sign}₹${(value / 1e7).toFixed(2).replace(/\.00$/, "")} Cr`;
-  if (value >= 1e5) return `${sign}₹${(value / 1e5).toFixed(2).replace(/\.00$/, "")} L`;
-  if (value >= 1e3) return `${sign}₹${(value / 1e3).toFixed(1).replace(/\.0$/, "")}k`;
+  if (value >= 1e7) return `${sign}₹${trimZeros((value / 1e7).toFixed(2))} Cr`;
+  if (value >= 1e5) return `${sign}₹${trimZeros((value / 1e5).toFixed(2))} L`;
+  if (value >= 1e3) return `${sign}₹${trimZeros((value / 1e3).toFixed(1))}k`;
   return formatInr(minor);
 }
 

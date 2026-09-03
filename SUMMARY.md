@@ -29,10 +29,13 @@
    outage.
 8. **Deliberately swapped probe 2 for probe 7** — reasoning in `DECISIONS.md`
    §3, dissent welcome and cheap to reverse.
-9. **Your list is `HANDOFF.md`, eleven items.** In order: a database, an admin
-   password, deploy, then everything else. Item 9 names two claims I could not
-   verify from the build machine — both are in the uptime probe, and both are
-   flagged in its `LAUNCH.md` checklist so you cannot post them by accident.
+9. **Your list is `HANDOFF.md`, twelve items — start at item 0.** The push to
+   GitHub was refused (org-level app permission, read works and write does
+   not), so the commits are local only until you fix that and push. Nothing is
+   lost. After that: a database, an admin password, deploy. Item 9
+   names two claims I could not verify from the build machine — both are in the
+   uptime probe, and both are flagged in its `LAUNCH.md` checklist so you
+   cannot post them by accident.
 10. **What I would do next, in your position:** set `DATABASE_URL`, deploy, get
     a CA to check four invoices, then post *one* probe and wait a week. Four
     launches in one week produces four ambiguous signals, which is the one

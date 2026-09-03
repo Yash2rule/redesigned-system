@@ -4,6 +4,8 @@ Everything that needs you. In order. Nothing else was left for you — design,
 copy, schema, naming, pricing, sample data and tests are all done and
 committed.
 
+**Push status: blocked — see item 0 first.**
+
 **Deployment status: not deployed.** No Vercel, Supabase or Neon credentials
 existed in the build environment, so there are no preview URLs to record. The
 repo is deploy-ready and item 3 below is a 15-minute job.
@@ -20,6 +22,43 @@ cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
 It will work with a completely empty `.env`. That is deliberate: every probe
 produces its full, real result with zero credentials. Each item below turns on
 one more thing.
+
+---
+
+## 0. BLOCKED: push access to this repository
+
+**This is the only item that was blocked rather than deferred, and it is why
+you are reading this in a local clone rather than on GitHub.**
+
+All the work is committed to the branch
+`claude/validation-probes-overnight-uok5hp`, but the push was refused:
+
+```
+remote: Claude doesn't have GitHub access to Yash2rule/redesigned-system
+        for your organization.
+fatal: unable to access '...': The requested URL returned error: 403
+```
+
+Read access works — `git fetch origin main` succeeds. Only writes are refused,
+so this is an app-installation permission, not a credential problem, and it is
+not something I can fix from here.
+
+**Fix, either one:**
+
+- Install or re-scope the Claude GitHub App for the organisation:
+  https://github.com/apps/claude/installations/select_target
+- Or reconnect GitHub from your own account settings:
+  https://claude.ai/customize/connectors?auth_start=github&auth_start_force=1
+
+**Then push it yourself** — the commits are already made and the branch already
+exists locally:
+
+```bash
+git -C <this-repo> push -u origin claude/validation-probes-overnight-uok5hp
+```
+
+Nothing is lost. Ten commits, each self-contained, in the order the work was
+done. `git log --oneline` reads as a build log.
 
 ---
 
