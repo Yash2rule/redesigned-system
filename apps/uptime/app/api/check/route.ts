@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import { getStore, isUserFacingError, recordCorpus } from "@probes/core/server";
 import type { Json } from "@probes/core";
 import { ensureSession, track } from "@probes/analytics";
-import { readSessionId, withSessionCookie } from "@probes/app-kit";
+import {
+  checkRateLimit,
+  rateLimitKey,
+  rateLimitedResponse,
+  readSessionId,
+  withSessionCookie,
+} from "@probes/app-kit";
 import { parseTargets, runChecks } from "../../../lib/monitor.ts";
 
 export const runtime = "nodejs";
@@ -27,6 +33,20 @@ export async function POST(request: Request): Promise<Response> {
       sessionId,
       minted,
     );
+
+  // Stricter than the document probes: every run here makes outbound requests
+  // to servers that belong to someone else. Ten runs an hour is generous for
+  // a person and useless for a script.
+  const limit = checkRateLimit(rateLimitKey(request, sessionId, "uptime-check"), {
+    limit: 10,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!limit.ok) {
+    return rateLimitedResponse(
+      limit,
+      `You have run ${limit.limit} checks in the last hour. Each one makes real requests to the sites you list, so we cap it — try again in ${Math.ceil(limit.retryAfterSeconds / 60)} minutes.`,
+    );
+  }
 
   let body: { targets?: unknown; brandName?: unknown; brandColor?: unknown };
   try {

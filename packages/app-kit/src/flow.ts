@@ -3,6 +3,7 @@ import { getStore, ingestFile, ingestText, isUserFacingError, recordCorpus } fro
 import type { Json, IngestResult, ProbeId, TextMode } from "@probes/core/server";
 import { ensureSession, track } from "@probes/analytics";
 import { readSessionId, withSessionCookie } from "./session.ts";
+import { checkRateLimit, rateLimitKey, rateLimitedResponse } from "./rate-limit.ts";
 
 export type ProbeFlowOptions<T> = {
   probe: ProbeId;
@@ -17,6 +18,8 @@ export type ProbeFlowOptions<T> = {
    * decide: a bank statement is always delimited, an offer letter never is.
    */
   textMode?: TextMode;
+  /** Requests allowed per hour per caller. Default 30. */
+  rateLimitPerHour?: number;
 };
 
 /**
@@ -41,6 +44,17 @@ export async function runProbeFlow<T>(
       sessionId,
       minted,
     );
+
+  const limit = checkRateLimit(rateLimitKey(request, sessionId, options.probe), {
+    limit: options.rateLimitPerHour ?? 30,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!limit.ok) {
+    return rateLimitedResponse(
+      limit,
+      `That is a lot of documents in one hour. Try again in ${Math.ceil(limit.retryAfterSeconds / 60)} minutes — or email us, because if you genuinely need this in bulk we would rather build you the right thing.`,
+    );
+  }
 
   let form: FormData;
   try {

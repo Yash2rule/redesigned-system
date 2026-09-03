@@ -15,7 +15,7 @@ Before anything else, prove it runs on your machine:
 ```bash
 pnpm install
 pnpm build          # 5 apps, ~60s cold
-pnpm test           # 218 tests, ~3s
+pnpm test           # 229 tests, ~3s
 cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
 ```
 
@@ -338,11 +338,18 @@ this on the page and ranks on result-to-email instead. Switch the ranking to
 `paid` once a rail is live — it is one comparator in
 `apps/admin/app/page.tsx`.
 
-**No rate limiting anywhere.** Fine at zero traffic; the uptime probe is the
-one that would hurt if abused, since it makes outbound requests. The SSRF guard
-is thorough (see `apps/uptime/lib/safe-url.ts` and its 19 tests) but it does not
-stop someone using you to make many requests to one victim. If that probe gets
-traffic, add a per-IP limit before anything else.
+**Rate limiting is per-instance, not global.** There is a limiter — 10 checks
+an hour for the uptime probe, 30 documents an hour for the others, keyed on the
+forwarded IP. It lives in process memory, so on a serverless host the budget is
+per warm instance rather than shared. That stops the thing that actually
+happens at this scale (one person, one script, one loop) and would not stop a
+distributed attacker. The 429 response says `x-ratelimit-scope: per-instance`
+so nobody builds on it thinking otherwise. If a probe gets real traffic, move
+the counter into Postgres — `packages/app-kit/src/rate-limit.ts` is about
+eighty lines and the interface would not change.
+
+The SSRF guard is separate and thorough: see `apps/uptime/lib/safe-url.ts` and
+its 19 tests.
 
 **Income tax slabs are hardcoded for FY 2025-26.** One file,
 `packages/core/src/india/tax.ts`, with the year attached, and every result page

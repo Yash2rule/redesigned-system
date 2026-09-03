@@ -503,3 +503,29 @@ describe("scheduled re-checks", () => {
     expect((stale?.payload as unknown as { checkedAt: string }).checkedAt).toBe(old);
   });
 });
+
+describe("rate limiting the check endpoint", () => {
+  it("refuses an eleventh check in an hour, because each one hits someone else's server", async () => {
+    const { POST } = await import("../app/api/check/route.ts");
+    const { resetRateLimits } = await import("@probes/app-kit");
+    resetRateLimits();
+
+    const call = () =>
+      POST(
+        new Request("http://localhost/api/check", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.9" },
+          body: JSON.stringify({ targets: "http://127.0.0.1:1/" }),
+        }),
+      );
+
+    for (let i = 0; i < 10; i += 1) {
+      expect((await call()).status, `call ${i + 1}`).toBe(200);
+    }
+    const blocked = await call();
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("retry-after")).toBeTruthy();
+    expect(((await blocked.json()) as { error: string }).error).toContain("checks in the last hour");
+    resetRateLimits();
+  });
+});
