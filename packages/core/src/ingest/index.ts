@@ -158,8 +158,18 @@ export async function ingestFile(
   }
 }
 
-/** Text pasted directly into a textarea, normalised the same way files are. */
-export function ingestText(raw: string): IngestResult {
+export type TextMode = "auto" | "csv" | "text";
+
+/**
+ * Text pasted directly into a textarea, normalised the same way files are.
+ *
+ * `mode` is explicit rather than sniffed, because sniffing was wrong in both
+ * directions: a bank statement whose first line is a title has no commas on
+ * that line, and a salary breakup full of "9,60,000" figures looks exactly
+ * like a comma-delimited file. Each probe knows which one it wants, so it says
+ * so instead of leaving it to a heuristic.
+ */
+export function ingestText(raw: string, mode: TextMode = "auto"): IngestResult {
   const text = raw.replace(/\r\n/g, "\n").trim();
   if (text.length < 10) {
     return {
@@ -171,11 +181,25 @@ export function ingestText(raw: string): IngestResult {
       meta: {},
     };
   }
-  // A pasted bank export is still a CSV.
-  const firstLine = text.split("\n", 1)[0] ?? "";
-  if ((firstLine.match(/,/g)?.length ?? 0) >= 2 && text.split("\n").length > 2) {
-    const csv = extractCsv(text);
-    if (csv.ok) return csv;
+
+  if (mode === "csv") return extractCsv(text);
+  if (mode === "text") return { kind: "text", text, rows: [], ok: true, message: "", meta: {} };
+
+  // "auto": treat it as delimited only when most lines split the same way.
+  const lines = text.split("\n").filter((line) => line.trim().length > 0);
+  if (lines.length >= 3) {
+    const counts = lines.slice(0, 40).map((line) => (line.match(/,/g)?.length ?? 0));
+    const modal = counts
+      .slice()
+      .sort(
+        (a, b) =>
+          counts.filter((c) => c === b).length - counts.filter((c) => c === a).length || a - b,
+      )[0];
+    const agreement = counts.filter((c) => c === modal).length / counts.length;
+    if ((modal ?? 0) >= 2 && agreement >= 0.7) {
+      const csv = extractCsv(text);
+      if (csv.ok) return csv;
+    }
   }
   return { kind: "text", text, rows: [], ok: true, message: "", meta: {} };
 }

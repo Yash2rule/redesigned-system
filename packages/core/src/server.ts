@@ -27,7 +27,7 @@ export { generateStructured, extractJson, z } from "./schema/index.ts";
 export type { StructuredOptions, StructuredResult } from "./schema/index.ts";
 
 export { ingestFile, ingestText, detectKind, MAX_UPLOAD_BYTES } from "./ingest/index.ts";
-export type { IngestKind, IngestResult } from "./ingest/index.ts";
+export type { IngestKind, IngestResult, TextMode } from "./ingest/index.ts";
 
 export { renderPdf, renderWorkbook } from "./render/index.ts";
 export type {

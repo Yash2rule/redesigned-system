@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getStore, ingestFile, ingestText, isUserFacingError, recordCorpus } from "@probes/core/server";
-import type { Json, IngestResult, ProbeId } from "@probes/core/server";
+import type { Json, IngestResult, ProbeId, TextMode } from "@probes/core/server";
 import { ensureSession, track } from "@probes/analytics";
 import { readSessionId, withSessionCookie } from "./session.ts";
 
@@ -12,6 +12,11 @@ export type ProbeFlowOptions<T> = {
   analyse: (input: IngestResult, form: FormData) => T | Promise<T>;
   /** Extra props to attach to the result_viewed event. */
   eventProps?: (result: T) => Record<string, Json>;
+  /**
+   * How to read pasted text. Probes state this rather than letting a heuristic
+   * decide: a bank statement is always delimited, an offer letter never is.
+   */
+  textMode?: TextMode;
 };
 
 /**
@@ -61,7 +66,7 @@ export async function runProbeFlow<T>(
   if (file instanceof File && file.size > 0) {
     ingested = await ingestFile(file.name, new Uint8Array(await file.arrayBuffer()));
   } else if (typeof text === "string" && text.trim().length > 0) {
-    ingested = ingestText(text);
+    ingested = ingestText(text, options.textMode ?? "auto");
   } else {
     return json({ error: "Attach a file or paste the text." }, 400);
   }
