@@ -346,3 +346,23 @@ describe("non-2xx responses are not all outages", () => {
     expect(result.worst).toBe("critical");
   });
 });
+
+describe("TLS SNI", () => {
+  it("does not send an IP address as the server name", async () => {
+    // RFC 6066 forbids an IP literal in SNI; Node deprecates sending one.
+    // Nothing listens on port 1, so this only exercises the connect options.
+    const warnings: string[] = [];
+    const original = process.emitWarning;
+    process.emitWarning = ((warning: unknown, ...rest: unknown[]) => {
+      warnings.push(String(warning));
+      return original.call(process, warning as string, ...(rest as []));
+    }) as typeof process.emitWarning;
+
+    try {
+      await checkTls("127.0.0.1", 1);
+    } finally {
+      process.emitWarning = original;
+    }
+    expect(warnings.join(" ")).not.toMatch(/ServerName to an IP address/);
+  });
+});

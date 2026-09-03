@@ -192,12 +192,17 @@ export function checkTls(hostname: string, port = 443): Promise<TlsCheck> {
         error: message,
       });
 
+    // SNI must not carry an IP address (RFC 6066). Sending one is ignored by
+    // servers and deprecated by Node; omitting it is the correct behaviour.
+    const isIpLiteral =
+      /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.includes(":");
+
     let settled = false;
     const socket = tls.connect(
       {
         host: hostname,
         port,
-        servername: hostname,
+        ...(isIpLiteral ? {} : { servername: hostname }),
         // We want to REPORT on a bad certificate, not refuse to look at one.
         // An expired or mismatched cert is exactly what an agency is paying
         // us to notice, so the handshake must complete either way.
