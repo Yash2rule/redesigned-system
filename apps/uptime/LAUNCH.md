@@ -30,8 +30,11 @@ client the link.
 | Plan | Price | What it is |
 | --- | --- | --- |
 | Manual check | Free | Up to 8 domains, no account, the full check. |
-| Studio | $29/mo | 25 monitors, branded status page, weekly report, daily checks. |
-| Agency | $79/mo | 150 monitors, your logo and domain, per-client pages, hourly checks. |
+| Studio | $29/mo | 25 monitors, branded status page, weekly report, change alerts. |
+| Agency | $79/mo | 150 monitors, your logo and your own domain, per-client pages, hourly re-checks. |
+
+Daily re-checks run for every monitor set, free ones included. The paid tiers
+add monitor count, hourly instead of daily, alerts, and a custom domain.
 
 Billed in USD through Lemon Squeezy, who act as merchant of record and handle
 sales tax.
@@ -83,10 +86,11 @@ Suggested subreddits: r/webdev, r/agency, r/web_design, r/ExperiencedDevs
 >   protocol that replaced WHOIS. Several country registries — `.in` is the one
 >   Indian agencies hit — publish thin records or none. It says unknown rather
 >   than guessing a date.
-> - **The status page doesn't re-check on load.** Eight live network requests
->   to your clients' servers per page view would be a DoS you'd be running
->   against your own clients. It shows the last completed check. Scheduled
->   re-checks are the paid plan.
+> - **The status page re-checks daily, not on page load.** A burst of live
+>   requests to your clients' servers on every visitor would be a DoS you'd be
+>   running against your own clients. It refreshes once a day on a schedule and
+>   keeps the last fortnight, so the link you sent a client stays current. It
+>   stops re-checking after 30 days with nobody looking.
 >
 > Free check is genuinely the full check, not a teaser. Not taking payments
 > yet.
@@ -108,8 +112,9 @@ For agency-owner and freelance-dev communities. Keep it to the pain.
 > certificate expires on a weekend or the domain lapses on a dead credit card
 > and the client's email stops working too.
 >
-> Also gives you a status page with your agency name and colour on it, and a
-> PDF you can forward to a client without editing.
+> Also gives you a status page with your agency name and colour on it — it
+> re-checks itself daily so the link stays current — and a PDF you can forward
+> to a client without editing.
 >
 > [link]
 >
@@ -173,6 +178,11 @@ For agency-owner and freelance-dev communities. Keep it to the pain.
       covered, and there is a test named after it.
 - [ ] r/webdev removes most self-promotion. Check whether they have a
       showcase thread and use it.
-- [ ] Do not describe scheduled checks as working. They are the paid plan and
-      the scheduler is not built. The pricing block says what they'd add; the
-      posts above are careful to say the free check is a point-in-time check.
+- [ ] **Set `CRON_SECRET` before posting.** Daily re-checks are built and the
+      copy above says they happen. Without that variable the cron endpoint
+      refuses every request and status pages silently go stale, which would
+      make the claim false. See HANDOFF item 7a.
+- [ ] Do not describe **hourly** checks as available. Vercel Hobby allows one
+      cron a day; hourly needs Pro or an external pinger. The Agency plan lists
+      it as what that tier adds, which is a promise about the tier, not a claim
+      about today.

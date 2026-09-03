@@ -15,7 +15,7 @@ Before anything else, prove it runs on your machine:
 ```bash
 pnpm install
 pnpm build          # 5 apps, ~60s cold
-pnpm test           # 213 tests, ~3s
+pnpm test           # 218 tests, ~3s
 cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
 ```
 
@@ -215,6 +215,19 @@ Events go to your database regardless; PostHog is a mirror, not the source of
 truth. The admin dashboard reads the database. Add it if you want funnels and
 session replay you did not have to build.
 
+**a. `CRON_SECRET` (uptime probe only)** — needed for scheduled re-checks. Set
+it and the daily cron in `apps/uptime/vercel.json` starts refreshing every live
+monitor set, which is what makes a status page you sent a client stay current.
+
+```bash
+openssl rand -base64 24
+```
+
+Without it `/api/cron/check` refuses every request, including Vercel's own —
+deliberately, because that endpoint makes outbound requests to arbitrary
+third-party domains and an open version of it is a request amplifier pointed at
+other people's servers. Nothing else breaks; status pages just go stale.
+
 **Resend** — `RESEND_API_KEY` from https://resend.com/api-keys, plus
 `AUTH_FROM_EMAIL` and an `AUTH_SECRET` of at least 16 characters. Only needed
 for magic-link sign-in, which is optional by design: every probe produces its
@@ -295,13 +308,13 @@ from which product, which is the entire point of running them in parallel.
 
 ## 11. Things I did not finish, and exactly where I stopped
 
-**Scheduled re-checks for the uptime probe.** The paid plans describe daily and
-hourly checks. There is no scheduler. The free manual check is complete and the
-copy is careful to describe it as point-in-time, so nothing currently on the
-site is untrue — but do not add "monitoring" to the marketing until this
-exists. Where to start: a `/api/cron/check` route that re-runs `runChecks` over
-stored monitors, plus a `crons` entry in `apps/uptime/vercel.json`. Vercel Hobby
-allows one cron per day; hourly needs Pro or an external pinger.
+**Hourly re-checks for the uptime probe.** Daily re-checks are built and
+working (`/api/cron/check`, wired to a daily cron in
+`apps/uptime/vercel.json`, gated on `CRON_SECRET` — see item 7a). The Agency
+plan promises *hourly*, which Vercel Hobby cannot do: it allows one cron per
+day. Either move that project to Pro, or point an external pinger (a GitHub
+Actions schedule works and is free) at `/api/cron/check` with the same bearer
+token. Until then, do not describe hourly checks as available.
 
 **Probe 2 (LLM prompt regression testing) was not built.** I swapped it for
 probe 7; the reasoning is in `DECISIONS.md` §3. Short version: without a model

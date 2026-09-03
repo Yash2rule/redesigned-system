@@ -327,7 +327,7 @@ export async function runChecks(targets: string[]): Promise<CheckRunResult> {
       healthy: monitors.filter((m) => m.worst === "ok" || m.worst === "info").length,
     },
     limitations: [
-      "Every check here runs from one place, right now. That tells you whether a site is up, not what its uptime percentage was last month — for that you need scheduled checks over time.",
+      "Every check runs from one place. The set is re-checked once a day and the status page keeps a fortnight of those, which shows a trend — but a daily sample is not an uptime percentage, and we do not present one.",
       "Domain expiry comes from RDAP, the free public registry protocol. Several country registries, .in among them, publish thin records or none, and those show as unknown rather than being guessed.",
       "Certificate checks read the certificate the server presents on a fresh handshake. A CDN may present a different certificate from a different region.",
     ],

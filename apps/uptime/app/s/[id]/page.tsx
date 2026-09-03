@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getStore } from "@probes/core/server";
 import { Container, Pill } from "@probes/ui";
-import type { BrandedResult } from "../../../lib/report.ts";
+import type { MonitorSet } from "../../../lib/schedule.ts";
 import { config } from "../../../lib/config.ts";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export default async function StatusPage({ params }: { params: Promise<{ id: str
   const artifact = await getStore().getArtifact(id);
   if (!artifact || artifact.probe !== "uptime") notFound();
 
-  const result = artifact.payload as unknown as BrandedResult;
+  const result = artifact.payload as unknown as MonitorSet;
   const brandName = result.brand?.name?.trim() || config.name;
   const brandColor = result.brand?.color ?? config.accent;
 
@@ -110,6 +110,30 @@ export default async function StatusPage({ params }: { params: Promise<{ id: str
             </section>
           ))}
         </div>
+
+        {(result.history?.length ?? 0) > 1 ? (
+          <section className="mt-8 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
+            <h2 className="text-sm font-semibold">Recent checks</h2>
+            <p className="mt-1 text-[13px] text-[var(--muted)]">
+              Newest first. Each square is one scheduled check.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {(result.history ?? []).map((entry) => (
+                <span
+                  key={entry.checkedAt}
+                  title={`${new Date(entry.checkedAt).toUTCString()} — ${entry.critical} needing attention, ${entry.warning} worth watching`}
+                  className={`h-6 w-3 rounded-sm ${
+                    entry.critical > 0
+                      ? "bg-rose-500"
+                      : entry.warning > 0
+                        ? "bg-amber-400"
+                        : "bg-emerald-500"
+                  }`}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <p className="mt-8 text-[13px] leading-relaxed text-[var(--muted)]">{config.disclaimer}</p>
       </Container>

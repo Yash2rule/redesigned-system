@@ -175,7 +175,12 @@ export class PgStore implements Store {
         payload: row.payload,
         createdAt: new Date(row.createdAt),
       })
-      .onConflictDoNothing();
+      // Re-checks rewrite the same artifact, so the status page URL an agency
+      // has already sent a client keeps working and shows fresh data.
+      .onConflictDoUpdate({
+        target: t.artifacts.id,
+        set: { payload: row.payload },
+      });
   }
 
   async getArtifact(id: string): Promise<ArtifactRow | null> {
@@ -189,6 +194,23 @@ export class PgStore implements Store {
       payload: row.payload as Json,
       createdAt: row.createdAt.toISOString(),
     };
+  }
+
+  async listArtifacts(probe: ProbeId, limit: number): Promise<ArtifactRow[]> {
+    await this.ready();
+    const rows = await this.db
+      .select()
+      .from(t.artifacts)
+      .where(eq(t.artifacts.probe, probe))
+      .orderBy(desc(t.artifacts.createdAt))
+      .limit(limit);
+    return rows.map((r) => ({
+      id: r.id,
+      probe,
+      sessionId: r.sessionId,
+      payload: r.payload as Json,
+      createdAt: r.createdAt.toISOString(),
+    }));
   }
 
   async getProbeStates(): Promise<ProbeStateRow[]> {

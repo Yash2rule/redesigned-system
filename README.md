@@ -21,7 +21,7 @@ Read [`DECISIONS.md`](./DECISIONS.md) for why these four, then
 ```bash
 pnpm install
 pnpm build     # all five apps
-pnpm test      # 213 tests
+pnpm test      # 218 tests
 pnpm dev       # all five in parallel, on ports 3000-3003 and 3010
 ```
 

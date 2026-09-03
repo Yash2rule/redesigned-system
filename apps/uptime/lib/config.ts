@@ -6,7 +6,7 @@ export const config: ProbeConfig = {
   tagline: "Uptime, SSL and domain expiry for every client site, on one branded page.",
   headline: "Find out which client site is about to break — before the client does.",
   subheadline:
-    "Paste your client domains. In one pass you get whether each site is up, when its certificate expires, when its domain expires, and which security headers are missing. Then put it on a status page with your name on it and send your client the link.",
+    "Paste your client domains. In one pass you get whether each site is up, when its certificate expires, when its domain expires, and which security headers are missing. Then put it on a status page with your name on it, send your client the link, and it re-checks itself every day.",
   ctaLabel: "Check my client sites",
   accent: "#7c3aed",
   accentSoft: "#f5f3ff",
@@ -35,7 +35,12 @@ export const config: ProbeConfig = {
       currency: "USD",
       interval: "month",
       description: "For a small agency with a handful of retainer clients.",
-      features: ["Up to 25 monitors", "Branded status page", "Weekly email report", "Daily checks"],
+      features: [
+        "Up to 25 monitors",
+        "Branded status page on our domain",
+        "Weekly email report",
+        "Email alert when something changes",
+      ],
     },
     {
       id: "agency",
@@ -47,9 +52,9 @@ export const config: ProbeConfig = {
       highlight: true,
       features: [
         "Up to 150 monitors",
-        "Your logo and domain on the status page",
+        "Your logo and your own domain on the status page",
         "Per-client status pages",
-        "Hourly checks",
+        "Hourly re-checks instead of daily",
         "Weekly PDF report per client",
       ],
     },
@@ -77,7 +82,7 @@ export const config: ProbeConfig = {
     {
       question: "How often are the checks run?",
       answer:
-        "The check on this page runs the moment you press the button. Scheduled re-checks are what the paid plans add — daily on Studio, hourly on Agency. A single check tells you the state right now; it does not give you an uptime percentage, and we don't pretend otherwise.",
+        "The check runs the moment you press the button, and every monitor set is then re-checked automatically once a day — free ones included. The status page shows the last fortnight of those checks. Paid plans add more monitors, hourly re-checks instead of daily, email alerts, and your own domain. A daily check still does not give you a true uptime percentage, and we don't claim one.",
       keywords: ["frequency", "how often", "schedule", "cron", "interval", "uptime percentage"],
     },
     {

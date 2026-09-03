@@ -25,6 +25,8 @@ export interface Store {
 
   saveArtifact(row: ArtifactRow): Promise<void>;
   getArtifact(id: string): Promise<ArtifactRow | null>;
+  /** Artifacts for one probe, newest first. Used by the scheduled re-checker. */
+  listArtifacts(probe: ProbeId, limit: number): Promise<ArtifactRow[]>;
 
   getProbeStates(): Promise<ProbeStateRow[]>;
   setProbeDecision(probe: ProbeId, decision: ProbeDecision, note: string | null): Promise<void>;

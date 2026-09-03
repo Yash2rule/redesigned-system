@@ -265,6 +265,7 @@ export class FileStore implements Store {
   async saveArtifact(row: ArtifactRow): Promise<void> {
     await this.serial(async () => {
       await this.load();
+      // Last write wins on re-read too, because the JSONL is replayed in order.
       this.memory.artifacts.set(row.id, row);
       if (!(await this.append("artifacts.jsonl", row))) this.unflushed.artifacts.push(row);
     });
@@ -273,6 +274,14 @@ export class FileStore implements Store {
   async getArtifact(id: string): Promise<ArtifactRow | null> {
     await this.serial(() => this.load());
     return this.memory.artifacts.get(id) ?? null;
+  }
+
+  async listArtifacts(probe: ProbeId, limit: number): Promise<ArtifactRow[]> {
+    await this.serial(() => this.load());
+    return [...this.memory.artifacts.values()]
+      .filter((row) => row.probe === probe)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
   }
 
   async getProbeStates(): Promise<ProbeStateRow[]> {

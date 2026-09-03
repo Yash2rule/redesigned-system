@@ -366,3 +366,140 @@ describe("TLS SNI", () => {
     expect(warnings.join(" ")).not.toMatch(/ServerName to an IP address/);
   });
 });
+
+describe("scheduled re-checks", () => {
+  it("refuses to run without CRON_SECRET, and with a wrong one", async () => {
+    const { isAuthorisedCron } = await import("./schedule.ts");
+    const saved = process.env.CRON_SECRET;
+    try {
+      delete process.env.CRON_SECRET;
+      const req = (auth?: string) =>
+        new Request("http://localhost/api/cron/check", {
+          headers: auth ? { authorization: auth } : {},
+        });
+
+      // No secret configured: nothing is authorised, not even a plausible header.
+      expect(isAuthorisedCron(req())).toBe(false);
+      expect(isAuthorisedCron(req("Bearer anything"))).toBe(false);
+
+      process.env.CRON_SECRET = "a-long-enough-cron-secret";
+      expect(isAuthorisedCron(req())).toBe(false);
+      expect(isAuthorisedCron(req("Bearer wrong"))).toBe(false);
+      expect(isAuthorisedCron(req("a-long-enough-cron-secret"))).toBe(false);
+      expect(isAuthorisedCron(req("Bearer a-long-enough-cron-secret"))).toBe(true);
+
+      // A trivially short secret is treated as unset.
+      process.env.CRON_SECRET = "short";
+      expect(isAuthorisedCron(req("Bearer short"))).toBe(false);
+    } finally {
+      if (saved === undefined) delete process.env.CRON_SECRET;
+      else process.env.CRON_SECRET = saved;
+    }
+  });
+
+  it("the cron route returns 401 rather than running when unauthorised", async () => {
+    const { GET } = await import("../app/api/cron/check/route.ts");
+    const saved = process.env.CRON_SECRET;
+    delete process.env.CRON_SECRET;
+    try {
+      const response = await GET(new Request("http://localhost/api/cron/check"));
+      expect(response.status).toBe(401);
+      expect(((await response.json()) as { error: string }).error).toContain("CRON_SECRET");
+    } finally {
+      if (saved !== undefined) process.env.CRON_SECRET = saved;
+    }
+  });
+
+  it("caps history and keeps the newest first", async () => {
+    const { appendHistory, MAX_HISTORY } = await import("./schedule.ts");
+    let set: { checkedAt: string; history?: unknown[] } = { checkedAt: "2026-01-01T00:00:00.000Z" };
+
+    for (let day = 1; day <= MAX_HISTORY + 5; day += 1) {
+      const checkedAt = `2026-02-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+      const history = appendHistory(set as never, {
+        checkedAt,
+        monitors: [{ hostname: "a.com", worst: "ok" }],
+        summary: { total: 1, critical: 0, warning: 0, healthy: 1 },
+        limitations: [],
+      } as never);
+      set = { checkedAt, history };
+    }
+
+    const history = set.history as { checkedAt: string }[];
+    expect(history).toHaveLength(MAX_HISTORY);
+    expect(history[0]?.checkedAt).toContain("2026-02-19");
+    // Strictly newest-first.
+    for (let i = 1; i < history.length; i += 1) {
+      expect(history[i - 1]!.checkedAt > history[i]!.checkedAt).toBe(true);
+    }
+  });
+
+  it("re-checks a stored monitor set in place, so the status page URL survives", async () => {
+    const { runScheduledChecks } = await import("./schedule.ts");
+    const { getStore } = await import("@probes/core/server");
+    const port = await startHttp((_req, res) => {
+      res.statusCode = 200;
+      res.setHeader("strict-transport-security", "max-age=31536000");
+      res.setHeader("x-content-type-options", "nosniff");
+      res.setHeader("content-security-policy", "frame-ancestors 'self'");
+      res.end("ok");
+    });
+
+    const store = getStore();
+    await store.saveArtifact({
+      id: "set-1",
+      probe: "uptime",
+      sessionId: "s1",
+      payload: {
+        checkedAt: new Date().toISOString(),
+        monitors: [{ input: `http://127.0.0.1:${port}/`, hostname: "127.0.0.1", worst: "critical" }],
+        summary: { total: 1, critical: 1, warning: 0, healthy: 0 },
+        limitations: [],
+        brand: { name: "Northline Studio", color: "#0f766e" },
+        history: [],
+      } as never,
+      createdAt: new Date().toISOString(),
+    });
+
+    const report = await runScheduledChecks();
+    expect(report.refreshed).toBeGreaterThanOrEqual(1);
+
+    const updated = await store.getArtifact("set-1");
+    const payload = updated?.payload as unknown as {
+      summary: { critical: number };
+      brand?: { name: string };
+      history: unknown[];
+    };
+    // Same id, fresh result, brand preserved, one history entry added.
+    expect(updated?.id).toBe("set-1");
+    expect(payload.summary.critical).toBe(0);
+    expect(payload.brand?.name).toBe("Northline Studio");
+    expect(payload.history).toHaveLength(1);
+  });
+
+  it("stops re-checking a set nobody has looked at for a month", async () => {
+    const { runScheduledChecks, STALE_AFTER_DAYS } = await import("./schedule.ts");
+    const { getStore } = await import("@probes/core/server");
+    const old = new Date(Date.now() - (STALE_AFTER_DAYS + 5) * 86_400_000).toISOString();
+
+    await getStore().saveArtifact({
+      id: "set-stale",
+      probe: "uptime",
+      sessionId: "s2",
+      payload: {
+        checkedAt: old,
+        monitors: [{ input: "http://127.0.0.1:1/", hostname: "127.0.0.1", worst: "critical" }],
+        summary: { total: 1, critical: 1, warning: 0, healthy: 0 },
+        limitations: [],
+        history: [],
+      } as never,
+      createdAt: old,
+    });
+
+    const report = await runScheduledChecks();
+    expect(report.skippedStale).toBeGreaterThanOrEqual(1);
+    // Untouched: the stored result still says what it said.
+    const stale = await getStore().getArtifact("set-stale");
+    expect((stale?.payload as unknown as { checkedAt: string }).checkedAt).toBe(old);
+  });
+});

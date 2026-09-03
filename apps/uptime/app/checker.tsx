@@ -267,9 +267,10 @@ function Result({ result, id }: { result: BrandedResult; id: string | null }) {
       {id ? (
         <div className="mt-3">
           <Note>
-            The status page link is shareable and shows this check. It does not re-run the checks
-            when a client opens it — that would mean eight network requests to your clients&apos;
-            servers per visitor. Scheduled re-checks are what the paid plans add.
+            The status page link is shareable and re-checks itself once a day. It does not
+            re-run the checks when a client opens it — that would mean a burst of network
+            requests to your clients&apos; servers on every visit. It keeps the last fortnight of
+            daily checks, and stops re-checking after 30 days with nobody looking at it.
           </Note>
         </div>
       ) : null}

@@ -66,7 +66,7 @@ export async function POST(request: Request): Promise<Response> {
       id,
       probe: "uptime",
       sessionId,
-      payload: { ...result, brand } as unknown as Json,
+      payload: { ...result, brand, history: [] } as unknown as Json,
       createdAt: new Date().toISOString(),
     });
   } catch (error) {

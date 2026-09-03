@@ -6,5 +6,11 @@
   "outputDirectory": ".next",
   "regions": [
     "iad1"
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/check",
+      "schedule": "0 6 * * *"
+    }
   ]
 }
