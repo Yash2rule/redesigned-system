@@ -57,8 +57,26 @@ exists locally:
 git -C <this-repo> push -u origin claude/validation-probes-overnight-uok5hp
 ```
 
-Nothing is lost. Ten commits, each self-contained, in the order the work was
-done. `git log --oneline` reads as a build log.
+Fifteen commits, each self-contained, in the order the work was done.
+`git log --oneline` reads as a build log.
+
+### If this session's container is gone before you get to it
+
+The container is ephemeral, so I also wrote a git bundle — a single file
+containing every commit and all history — and sent it to you in the
+conversation. It is also at `validation-probes.bundle` in the home directory
+of this session.
+
+Restoring from it loses nothing:
+
+```bash
+git clone validation-probes.bundle redesigned-system   -b claude/validation-probes-overnight-uok5hp
+cd redesigned-system
+git remote set-url origin https://github.com/Yash2rule/redesigned-system
+git push -u origin claude/validation-probes-overnight-uok5hp
+```
+
+I verified this round-trips: 15 commits, 236 files, identical HEAD.
 
 ---
 
