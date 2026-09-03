@@ -22,7 +22,7 @@ Read [`DECISIONS.md`](./DECISIONS.md) for why these four, then
 pnpm install
 pnpm build     # all five apps
 pnpm test      # 168 tests
-pnpm dev       # all five in parallel
+pnpm dev       # all five in parallel, on ports 3000-3003 and 3010
 ```
 
 Everything works with an empty environment. Each app has an `.env.example`
@@ -34,6 +34,7 @@ To look at the dashboard with realistic numbers before you have traffic:
 ```bash
 DATA_DIR=./.data-demo pnpm seed
 cd apps/admin && DATA_DIR=../../.data-demo ADMIN_PASSWORD=changeme pnpm dev
+# then http://localhost:3010
 ```
 
 ## Packages

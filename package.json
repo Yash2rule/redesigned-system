@@ -14,7 +14,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run typecheck",
     "deploy:all": "node scripts/deploy-all.mjs",
-    "seed": "node --experimental-strip-types scripts/seed-demo-data.ts"
+    "seed": "node --experimental-strip-types scripts/seed-demo-data.mts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
