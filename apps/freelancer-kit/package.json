@@ -1,0 +1,26 @@
+{
+  "name": "@probes/app-freelancer-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@probes/analytics": "workspace:*",
+    "@probes/auth": "workspace:*",
+    "@probes/billing": "workspace:*",
+    "@probes/core": "workspace:*",
+    "@probes/ui": "workspace:*",
+    "next": "^16.3.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": ["DATABASE_URL", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "LLM_PROVIDER", "POSTHOG_KEY", "POSTHOG_HOST", "RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET", "LEMONSQUEEZY_API_KEY", "LEMONSQUEEZY_STORE_ID", "RESEND_API_KEY", "ADMIN_PASSWORD", "APP_BASE_URL", "DATA_DIR"]
+    },
+    "typecheck": { "dependsOn": ["^build"] },
+    "dev": { "cache": false, "persistent": true }
+  }
+}

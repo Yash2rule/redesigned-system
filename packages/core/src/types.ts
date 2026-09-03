@@ -1,0 +1,95 @@
+/** The four probes running tonight. Every stored row is tagged with one. */
+export const PROBES = ["offer-decoder", "ledger", "uptime", "freelancer-kit"] as const;
+export type ProbeId = (typeof PROBES)[number];
+
+export function isProbeId(value: unknown): value is ProbeId {
+  return typeof value === "string" && (PROBES as readonly string[]).includes(value);
+}
+
+/**
+ * The seven funnel events, in order. The admin dashboard renders them as
+ * columns in exactly this order, so the array is the source of truth for both
+ * validation and layout.
+ */
+export const EVENT_NAMES = [
+  "page_view",
+  "upload_started",
+  "result_viewed",
+  "price_clicked",
+  "checkout_started",
+  "paid",
+  "email_captured",
+] as const;
+export type EventName = (typeof EVENT_NAMES)[number];
+
+export function isEventName(value: unknown): value is EventName {
+  return typeof value === "string" && (EVENT_NAMES as readonly string[]).includes(value);
+}
+
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
+export type SessionRow = {
+  id: string;
+  probe: ProbeId;
+  createdAt: string;
+  userAgent: string | null;
+  referrer: string | null;
+};
+
+export type EventRow = {
+  id: string;
+  sessionId: string;
+  probe: ProbeId;
+  name: EventName;
+  props: Record<string, Json>;
+  createdAt: string;
+};
+
+export type IntentRow = {
+  id: string;
+  sessionId: string;
+  probe: ProbeId;
+  email: string;
+  plan: string;
+  amountMinor: number;
+  currency: "INR" | "USD";
+  note: string | null;
+  createdAt: string;
+};
+
+export type CorpusRow = {
+  id: string;
+  probe: ProbeId;
+  kind: string;
+  inputHash: string;
+  input: Json;
+  output: Json;
+  createdAt: string;
+};
+
+/** A produced result, kept so a visitor can reopen it by URL. */
+export type ArtifactRow = {
+  id: string;
+  probe: ProbeId;
+  sessionId: string | null;
+  payload: Json;
+  createdAt: string;
+};
+
+export type ProbeDecision = "undecided" | "keep" | "kill";
+
+export type ProbeStateRow = {
+  probe: ProbeId;
+  decision: ProbeDecision;
+  note: string | null;
+  updatedAt: string;
+};
+
+/** One probe's funnel, as the admin dashboard needs it. */
+export type FunnelRow = {
+  probe: ProbeId;
+  sessions: number;
+  counts: Record<EventName, number>;
+  intents: number;
+  intentValueMinor: number;
+};
