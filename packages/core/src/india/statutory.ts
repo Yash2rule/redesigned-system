@@ -119,3 +119,97 @@ export function professionalTaxAnnual(state: StateCode): PtRule {
 export function isStateCode(value: unknown): value is StateCode {
   return typeof value === "string" && value in PROFESSIONAL_TAX;
 }
+
+const ONES = [
+  "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
+  "Eighteen", "Nineteen",
+];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+function twoDigits(value: number): string {
+  if (value < 20) return ONES[value] ?? "";
+  const tens = TENS[Math.floor(value / 10)] ?? "";
+  const ones = ONES[value % 10] ?? "";
+  return ones ? `${tens} ${ones}` : tens;
+}
+
+function threeDigits(value: number): string {
+  const hundreds = Math.floor(value / 100);
+  const rest = value % 100;
+  const parts = [];
+  if (hundreds > 0) parts.push(`${ONES[hundreds]} Hundred`);
+  if (rest > 0) parts.push(twoDigits(rest));
+  return parts.join(" ");
+}
+
+/**
+ * Amount in words, Indian numbering (lakh/crore).
+ *
+ * GST invoices conventionally carry the amount in words as a check against
+ * a tampered figure, so this is part of a compliant invoice rather than
+ * decoration.
+ *
+ * @param minor Amount in paise.
+ */
+export function amountInWords(minor: number): string {
+  const negative = minor < 0;
+  const abs = Math.abs(Math.round(minor));
+  const rupees = Math.floor(abs / 100);
+  const paise = abs % 100;
+
+  const chunk = (value: number, label: string): string =>
+    value > 0 ? `${threeDigits(value)} ${label} ` : "";
+
+  let words = "";
+  if (rupees === 0) {
+    words = "Zero";
+  } else {
+    words =
+      chunk(Math.floor(rupees / 10_000_000), "Crore") +
+      chunk(Math.floor((rupees % 10_000_000) / 100_000), "Lakh") +
+      chunk(Math.floor((rupees % 100_000) / 1_000), "Thousand") +
+      threeDigits(rupees % 1_000);
+  }
+
+  const parts = [`${negative ? "Minus " : ""}Rupees ${words.trim().replace(/\s+/g, " ")}`];
+  if (paise > 0) parts.push(`and ${twoDigits(paise)} Paise`);
+  return `${parts.join(" ")} only`;
+}
+
+/** GST state codes, used for the place-of-supply field and for intra/inter-state. */
+export const GST_STATE_CODES: { code: string; name: string }[] = [
+  { code: "01", name: "Jammu and Kashmir" }, { code: "02", name: "Himachal Pradesh" },
+  { code: "03", name: "Punjab" }, { code: "04", name: "Chandigarh" },
+  { code: "05", name: "Uttarakhand" }, { code: "06", name: "Haryana" },
+  { code: "07", name: "Delhi" }, { code: "08", name: "Rajasthan" },
+  { code: "09", name: "Uttar Pradesh" }, { code: "10", name: "Bihar" },
+  { code: "11", name: "Sikkim" }, { code: "12", name: "Arunachal Pradesh" },
+  { code: "13", name: "Nagaland" }, { code: "14", name: "Manipur" },
+  { code: "15", name: "Mizoram" }, { code: "16", name: "Tripura" },
+  { code: "17", name: "Meghalaya" }, { code: "18", name: "Assam" },
+  { code: "19", name: "West Bengal" }, { code: "20", name: "Jharkhand" },
+  { code: "21", name: "Odisha" }, { code: "22", name: "Chhattisgarh" },
+  { code: "23", name: "Madhya Pradesh" }, { code: "24", name: "Gujarat" },
+  { code: "26", name: "Dadra and Nagar Haveli and Daman and Diu" },
+  { code: "27", name: "Maharashtra" }, { code: "29", name: "Karnataka" },
+  { code: "30", name: "Goa" }, { code: "31", name: "Lakshadweep" },
+  { code: "32", name: "Kerala" }, { code: "33", name: "Tamil Nadu" },
+  { code: "34", name: "Puducherry" }, { code: "35", name: "Andaman and Nicobar Islands" },
+  { code: "36", name: "Telangana" }, { code: "37", name: "Andhra Pradesh" },
+  { code: "38", name: "Ladakh" }, { code: "97", name: "Other Territory" },
+];
+
+export function gstStateName(code: string): string | null {
+  return GST_STATE_CODES.find((s) => s.code === code)?.name ?? null;
+}
+
+/** A GSTIN is 2-digit state code + PAN + entity code + 'Z' + checksum. */
+export function isValidGstinShape(value: string): boolean {
+  return /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(value.trim().toUpperCase());
+}
+
+export function stateCodeFromGstin(value: string): string | null {
+  const trimmed = value.trim();
+  return isValidGstinShape(trimmed) ? trimmed.slice(0, 2) : null;
+}

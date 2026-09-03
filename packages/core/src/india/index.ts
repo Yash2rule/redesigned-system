@@ -21,5 +21,10 @@ export {
   gratuityPayableAfter,
   professionalTaxAnnual,
   isStateCode,
+  amountInWords,
+  GST_STATE_CODES,
+  gstStateName,
+  isValidGstinShape,
+  stateCodeFromGstin,
 } from "./statutory.ts";
 export type { PfBasis, PfResult, StateCode } from "./statutory.ts";
