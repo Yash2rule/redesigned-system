@@ -29,7 +29,7 @@
    visitors per event, with a persisted kill/keep toggle. It ranks on
    result-to-email, and says on the page why: `paid` reads zero everywhere
    until a rail exists, so it cannot rank anything.
-7. **385 tests pass and all five apps build.** Verified in Chromium at 390px and
+7. **396 tests pass and all five apps build.** Verified in Chromium at 390px and
    1280px: zero console errors, no horizontal overflow, forms validate, and
    both document probes produce real results through the actual UI.
 8. **Bugs found by running it rather than by reading it**, all fixed: a missing
@@ -37,7 +37,10 @@
    parsing as ₹32, phone numbers with an internal space escaping redaction, a
    greedy `gst` keyword, `Dr`/`Cr` suffixes parsing as null, FileStore caching
    so an API-route write was invisible to the page, and treating a 403 as an
-   outage.
+   outage. A security pass then found two more, both fixed with tests: the
+   uptime checks re-resolved a hostname after vetting it (DNS rebinding walked
+   straight past the SSRF guard), and the admin CSV export handed Excel a
+   formula written by an anonymous stranger.
 9. **Deliberately swapped probe 2 for probe 7** — reasoning in `DECISIONS.md`
    §3, dissent welcome and cheap to reverse.
 10. **Your list is `HANDOFF.md`, twelve items — start at item 0.** The push to

@@ -21,7 +21,7 @@ Read [`DECISIONS.md`](./DECISIONS.md) for why these four, then
 ```bash
 pnpm install
 pnpm build     # all five apps
-pnpm test      # 385 tests
+pnpm test      # 396 tests
 pnpm dev       # all five in parallel, on ports 3000-3003 and 3010
 ```
 
@@ -63,6 +63,35 @@ citation, and never files anything.
 that produced it. Clause flags quote the sentence they matched. Tax figures show
 the slabs, the rebate and the surcharge separately, so a CA can check the
 arithmetic in thirty seconds.
+
+## Security invariants worth knowing before you change things
+
+Three things here are load-bearing and each has tests that fail loudly if you
+remove them.
+
+**The uptime checker is an SSRF target by design** — it takes a hostname from a
+stranger and makes a request to it from our server. `apps/uptime/lib/safe-url.ts`
+allows only http/https, only ports 80 and 443, and only publicly routable
+addresses, re-checked on every redirect hop. Critically, it also *pins* the
+connection to the address it vetted (`pinnedLookup`), because otherwise the
+client would resolve the hostname a second time and a nameserver the attacker
+controls could answer the two queries differently. That is why `checkHttp` uses
+`node:http` rather than `fetch`: `fetch` gives no way to choose the address it
+connects to. Response bodies are never read, only drained.
+
+**Anything a stranger typed is escaped for wherever it lands.** The admin CSV
+export neutralises leading `=` `+` `-` `@` before quoting, because a spreadsheet
+runs those as formulas and the `note` field on a purchase intent is written
+exclusively by hand-crafted requests.
+
+**Cron routes fail closed.** No `CRON_SECRET` of at least 16 characters means
+they refuse to run rather than running unauthenticated. Same for the admin
+dashboard without `ADMIN_PASSWORD`.
+
+No key material lives in the repository. The TLS test certificates are generated
+at test time by `tests/certs.ts`, with expiry relative to the moment the suite
+runs — so the "nearly expired" case is always nearly expired and the tests never
+go red on a date nobody wrote down.
 
 ## Deploying
 
