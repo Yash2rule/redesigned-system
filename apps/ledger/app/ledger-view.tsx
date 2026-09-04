@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatInr } from "@probes/core/money.ts";
 import {
   AssumptionsPanel,
@@ -12,6 +12,16 @@ import {
   UploadWidget,
 } from "@probes/ui";
 import type { LedgerResult } from "../lib/ledger.ts";
+import { CATEGORIES } from "../lib/categorise.ts";
+import type { CategoryId } from "../lib/categorise.ts";
+import {
+  applyOverrides,
+  clearOverrides,
+  merchantKey,
+  readOverrides,
+  saveOverride,
+  type Overrides,
+} from "../lib/overrides.ts";
 
 const SAMPLE = `Date,Narration,Chq./Ref.No.,Withdrawal Amt.,Deposit Amt.,Closing Balance
 01/04/2026,SALARY CREDIT ACME TECHNOLOGIES,NEFT0012,,185000.00,412300.50
@@ -23,15 +33,30 @@ const SAMPLE = `Date,Narration,Chq./Ref.No.,Withdrawal Amt.,Deposit Amt.,Closing
 const PREVIEW_ROWS = 40;
 
 export function LedgerView() {
-  const [result, setResult] = useState<LedgerResult | null>(null);
+  const [raw, setRaw] = useState<LedgerResult | null>(null);
   const [artifactId, setArtifactId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [filter, setFilter] = useState<string>("all");
+  const [overrides, setOverrides] = useState<Overrides>({});
+
+  // Corrections live in this browser; they are only readable after mount.
+  useEffect(() => setOverrides(readOverrides()), []);
+
+  // The displayed ledger is always the raw one with corrections layered on,
+  // so totals and the GST list move when a category is fixed.
+  const result = raw ? applyOverrides(raw, overrides) : null;
+
+  function correct(narration: string, category: CategoryId) {
+    const merchant = merchantKey(narration);
+    if (!merchant) return;
+    saveOverride(merchant, category);
+    setOverrides((prev) => ({ ...prev, [merchant]: category }));
+  }
 
   function handleResult(payload: unknown) {
     const typed = payload as { id?: string; result?: LedgerResult };
     if (typed.result) {
-      setResult(typed.result);
+      setRaw(typed.result);
       setArtifactId(typed.id ?? null);
       setShowAll(false);
       requestAnimationFrame(() =>
@@ -60,6 +85,12 @@ export function LedgerView() {
           onShowAll={() => setShowAll(true)}
           filter={filter}
           onFilter={setFilter}
+          overrides={overrides}
+          onCorrect={correct}
+          onClearOverrides={() => {
+            clearOverrides();
+            setOverrides({});
+          }}
         />
       ) : null}
     </div>
@@ -73,6 +104,9 @@ function Result({
   onShowAll,
   filter,
   onFilter,
+  overrides,
+  onCorrect,
+  onClearOverrides,
 }: {
   result: LedgerResult;
   artifactId: string | null;
@@ -80,6 +114,9 @@ function Result({
   onShowAll: () => void;
   filter: string;
   onFilter: (value: string) => void;
+  overrides: Overrides;
+  onCorrect: (narration: string, category: CategoryId) => void;
+  onClearOverrides: () => void;
 }) {
   const filtered =
     filter === "all" ? result.entries : result.entries.filter((e) => e.category === filter);
@@ -185,9 +222,37 @@ function Result({
         </ul>
       </ResultSection>
 
+      {Object.keys(overrides).length > 0 ? (
+        <ResultSection
+          title={`Your category rules (${Object.keys(overrides).length})`}
+          description="Applied on top of ours, to this statement and every future one. Stored in this browser only."
+          actions={
+            <button
+              type="button"
+              onClick={onClearOverrides}
+              className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm font-medium"
+            >
+              Clear them all
+            </button>
+          }
+        >
+          <ul className="flex flex-wrap gap-2">
+            {Object.entries(overrides).map(([merchant, category]) => (
+              <li
+                key={merchant}
+                className="rounded-full border border-[var(--line)] bg-[var(--canvas)] px-3 py-1 text-[13px]"
+              >
+                anything matching <span className="font-mono font-medium">{merchant}</span> →{" "}
+                <span className="font-medium">{CATEGORIES[category].label}</span>
+              </li>
+            ))}
+          </ul>
+        </ResultSection>
+      ) : null}
+
       <ResultSection
         title="Every transaction"
-        description="The 'Matched on' column is the keyword that produced the category. If it looks wrong, it is wrong — and now you can see exactly why."
+        description="The 'Matched on' column is the keyword that produced each category. Change any category and we remember it for that merchant — every matching row, in this statement and in every future one."
         actions={
           <select
             value={filter}
@@ -212,7 +277,19 @@ function Result({
             <span key="d" className="block max-w-[22rem] truncate" title={entry.narration}>
               {entry.narration}
             </span>,
-            entry.categoryLabel,
+            <select
+              key="c"
+              value={entry.category}
+              aria-label={`Category for ${entry.narration}`}
+              onChange={(event) => onCorrect(entry.narration, event.target.value as CategoryId)}
+              className="max-w-[13rem] rounded border border-[var(--line)] bg-white px-2 py-1 text-[13px]"
+            >
+              {Object.values(CATEGORIES).map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.label}
+                </option>
+              ))}
+            </select>,
             <span key="m" className="font-mono text-[12px] text-[var(--muted)]">
               {entry.matchedOn ?? "—"}
             </span>,
@@ -236,15 +313,35 @@ function Result({
 
       {artifactId ? (
         <div className="mt-6">
-          <a
-            href={`/api/export?id=${encodeURIComponent(artifactId)}`}
+          <button
+            type="button"
+            onClick={async () => {
+              // POST rather than a link: the corrections travel with the
+              // request so the spreadsheet matches what is on screen.
+              const response = await fetch("/api/export", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ id: artifactId, overrides }),
+              });
+              if (!response.ok) return;
+              const blob = await response.blob();
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `ledger-${artifactId.slice(0, 8)}.xlsx`;
+              link.click();
+              URL.revokeObjectURL(url);
+            }}
             className="inline-flex rounded-lg bg-[var(--ink)] px-5 py-3 text-sm font-semibold text-white"
           >
             Download the Excel file
-          </a>
+          </button>
           <p className="mt-2 text-[13px] text-[var(--muted)]">
             Four sheets: the full ledger, month by month, by category, and a GST review list with
             blank columns for the invoice figures only you can fill in.
+            {Object.keys(overrides).length > 0
+              ? " Your category corrections are included."
+              : ""}
           </p>
         </div>
       ) : null}

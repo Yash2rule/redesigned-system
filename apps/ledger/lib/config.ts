@@ -18,8 +18,8 @@ export const config: ProbeConfig = {
       body: "HDFC, ICICI, SBI, Axis, Kotak and the UPI apps all name their columns differently. We map them by name, not by position, and tell you exactly which column we used for what.",
     },
     {
-      title: "Categories you can argue with",
-      body: "Every row shows the keyword that decided its category. When we get one wrong you can see why in one glance, instead of wondering what the model was thinking.",
+      title: "Categories you can argue with — and correct",
+      body: "Every row shows the keyword that decided its category. When we get one wrong, change it: we remember the rule for that merchant and apply it to every matching row, in this statement and every future one.",
     },
     {
       title: "GST-ready, honestly framed",
@@ -45,8 +45,12 @@ export const config: ProbeConfig = {
       interval: "month",
       description: "For anyone doing this every month instead of every March.",
       highlight: true,
-      features: ["Unlimited statements", "Excel export", "Cancel any month"],
-      planned: ["Category rules you can override and save"],
+      features: [
+        "Unlimited statements",
+        "Excel export",
+        "Category rules you correct once and we remember",
+        "Cancel any month",
+      ],
     },
     {
       id: "yearly",
@@ -94,8 +98,8 @@ export const config: ProbeConfig = {
     {
       question: "What if a category is wrong?",
       answer:
-        "Every row shows the keyword that produced its category, so you can spot it immediately. Fix it in the Excel export, and email us the description — merchant rules are the part of this tool that gets better every week.",
-      keywords: ["wrong", "incorrect", "category", "fix", "edit", "override"],
+        "Change it on the results page. We work out which merchant the row is about, remember your choice, and apply it to every matching row — including in future statements. The totals, the category breakdown and the GST shortlist all move with it, and your corrections are included in the Excel download. The rules live in your browser, so they do not follow you to another device, and there is a button to clear them.",
+      keywords: ["wrong", "incorrect", "category", "fix", "edit", "override", "rule", "correct", "change"],
     },
     {
       question: "Does it handle transfers between my own accounts?",

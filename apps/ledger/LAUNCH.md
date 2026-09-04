@@ -31,7 +31,7 @@ guessed silently: every category shows the keyword that produced it.
 | --- | --- | --- |
 | First statement | Free | Complete, Excel export included. |
 | One statement | ₹149 | Per statement, no subscription. |
-| Monthly | ₹399/mo | Unlimited statements. |
+| Monthly | ₹399/mo | Unlimited statements, saved category rules. |
 | Yearly | ₹3,990/yr | Two months free. |
 
 **Disclaimer**
@@ -68,10 +68,12 @@ r/smallbusinessindia.
 >
 > Two design decisions I'd defend:
 >
-> **It shows you the keyword that produced each category.** It's a rules
-> engine, not a model. If it puts something in the wrong bucket you can see
-> exactly why in one glance and fix it, rather than wondering what the model
-> was thinking. I'd rather be auditable than clever.
+> **It shows you the keyword that produced each category, and lets you correct
+> it.** It's a rules engine, not a model. If it puts something in the wrong
+> bucket you can see exactly why — and change it, at which point it remembers
+> the rule for that merchant and applies it to every matching row, in that
+> statement and every future one. The totals and the GST list move with it, and
+> the correction is in the Excel download. I'd rather be auditable than clever.
 >
 > **It does not compute an input tax credit figure.** A bank statement shows
 > what you paid, never the tax inside it. Anything claiming to compute your ITC

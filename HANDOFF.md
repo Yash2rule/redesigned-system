@@ -15,7 +15,7 @@ Before anything else, prove it runs on your machine:
 ```bash
 pnpm install
 pnpm build          # 5 apps, ~60s cold
-pnpm test           # 268 tests, ~3s
+pnpm test           # 301 tests, ~3s
 cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
 ```
 
