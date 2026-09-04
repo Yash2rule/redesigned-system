@@ -108,10 +108,9 @@ export class PgStore implements Store {
   /**
    * Serverless-friendly pool: Supabase/Neon free tiers cap connections hard.
    *
-   * `connect_timeout` and `statement_timeout` bound the two cases the server
-   * gets to see. They are not enough on their own — see `guard` — but an
-   * unbounded connect is worth ruling out on a platform that charges by the
-   * second.
+   * `connect_timeout` bounds the one case the server gets to see. It is not
+   * enough on its own — see `guard` — but an unbounded connect is worth ruling
+   * out on a platform that charges by the second.
    */
   private connect(): void {
     this.sql = postgres(this.url, {
@@ -127,7 +126,14 @@ export class PgStore implements Store {
       max_lifetime: 60 * 10,
       prepare: false,
       connect_timeout: 10,
-      connection: { statement_timeout: "60s" },
+      // No statement_timeout here on purpose. Set as a bare number of
+      // milliseconds — which is how postgres.js types it — it was applied as
+      // something far smaller in production, and every statement came back
+      // cancelled (57014) within tens of milliseconds. Spelling it "60s"
+      // behaved, but a setting that only works when it disagrees with its own
+      // type is a setting nobody will maintain correctly. The client-side
+      // deadline in `guard` bounds the wait that actually mattered, and does
+      // it in one place, in units nothing can reinterpret.
     });
     this.db = drizzle(this.sql, { schema: t });
     this.migrated = null;
