@@ -167,3 +167,21 @@ export async function notifyChanges(
     skipped: result.notConfigured ? "email is not configured on this deployment" : "",
   };
 }
+
+/** Send the weekly summary for one monitor set. */
+export async function sendWeeklyReport(
+  set: MonitorSet & { alertEmails?: string[] },
+  statusUrl: string,
+): Promise<{ sent: number; skipped: string }> {
+  const recipients = set.alertEmails ?? [];
+  if (recipients.length === 0) return { sent: 0, skipped: "no address on this monitor set" };
+
+  const brandName = set.brand?.name?.trim() || config.name;
+  const { subject, text } = weeklyReportEmail(set, brandName, statusUrl);
+  const result = await sendEach(recipients, () => ({ subject, text }));
+
+  return {
+    sent: result.sent,
+    skipped: result.notConfigured ? "email is not configured on this deployment" : "",
+  };
+}

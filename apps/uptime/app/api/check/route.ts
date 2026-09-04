@@ -104,6 +104,9 @@ export async function POST(request: Request): Promise<Response> {
         brand,
         history: [],
         alertEmails: alertEmail ? [alertEmail] : [],
+        // The first weekly summary lands a week from now — they have just
+        // read these results on screen.
+        lastWeeklyReportAt: new Date().toISOString(),
       } as unknown as Json,
       createdAt: new Date().toISOString(),
     });

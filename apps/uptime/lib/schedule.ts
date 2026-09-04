@@ -2,7 +2,7 @@ import { getStore } from "@probes/core/server";
 import type { Json } from "@probes/core";
 import { runChecks } from "./monitor.ts";
 import type { CheckRunResult, Severity } from "./monitor.ts";
-import { diffChecks, notifyChanges } from "./notify.ts";
+import { diffChecks, notifyChanges, sendWeeklyReport } from "./notify.ts";
 
 /**
  * Scheduled re-checks.
@@ -27,6 +27,8 @@ export type MonitorSet = CheckRunResult & {
   history?: HistoryEntry[];
   /** Where to send change alerts. Empty means the owner did not ask for any. */
   alertEmails?: string[];
+  /** When the weekly summary last went out, so it goes out weekly not daily. */
+  lastWeeklyReportAt?: string;
 };
 
 /** Roughly a fortnight of daily checks — enough to see a trend, small to store. */
@@ -38,6 +40,9 @@ export const MAX_HISTORY = 14;
  * grow unboundedly and hammer domains nobody is watching any more.
  */
 export const STALE_AFTER_DAYS = 30;
+
+/** A weekly report means weekly, even though the checker runs daily. */
+export const WEEKLY_REPORT_INTERVAL_MS = 7 * 86_400_000;
 
 /** How many sets one scheduled invocation will refresh. */
 export const MAX_SETS_PER_RUN = 25;
@@ -60,6 +65,8 @@ export type ScheduleReport = {
   alertsSent: number;
   /** Sets where something changed but no alert could be sent, and why. */
   alertsSkipped: string[];
+  /** Weekly summaries delivered this run. */
+  weeklyReportsSent: number;
   failed: { id: string; error: string }[];
   startedAt: string;
   finishedAt: string;
@@ -85,6 +92,7 @@ export async function runScheduledChecks(
     skippedStale: 0,
     alertsSent: 0,
     alertsSkipped: [],
+    weeklyReportsSent: 0,
     failed: [],
     startedAt,
     finishedAt: startedAt,
@@ -114,11 +122,24 @@ export async function runScheduledChecks(
 
     try {
       const next = await runChecks(targets);
+      const statusUrl = `${baseUrl}/s/${artifact.id}`;
+
+      // The weekly summary goes out at most once every seven days, even though
+      // this runs daily. A "weekly" report arriving every morning is a daily
+      // report nobody asked for.
+      const lastWeekly = previous.lastWeeklyReportAt
+        ? Date.parse(previous.lastWeeklyReportAt)
+        : 0;
+      const weeklyDue =
+        (previous.alertEmails?.length ?? 0) > 0 &&
+        now.getTime() - lastWeekly >= WEEKLY_REPORT_INTERVAL_MS;
+
       const merged: MonitorSet = {
         ...next,
         brand: previous.brand,
         alertEmails: previous.alertEmails,
         history: appendHistory(previous, next),
+        lastWeeklyReportAt: previous.lastWeeklyReportAt,
       };
       await store.saveArtifact({
         id: artifact.id,
@@ -134,10 +155,25 @@ export async function runScheduledChecks(
       // one that matters gets filtered too.
       const changes = diffChecks(previous, next);
       if (changes.length > 0) {
-        const statusUrl = `${baseUrl}/s/${artifact.id}`;
         const outcome = await notifyChanges(merged, changes, statusUrl);
         report.alertsSent += outcome.sent;
         if (outcome.skipped) report.alertsSkipped.push(`${artifact.id.slice(0, 8)}: ${outcome.skipped}`);
+      }
+
+      if (weeklyDue) {
+        const outcome = await sendWeeklyReport(merged, statusUrl);
+        report.weeklyReportsSent += outcome.sent;
+        // Record the send only when something actually went out, so an
+        // unconfigured deployment does not silently burn the week's slot.
+        if (outcome.sent > 0) {
+          await store.saveArtifact({
+            id: artifact.id,
+            probe: "uptime",
+            sessionId: artifact.sessionId,
+            payload: { ...merged, lastWeeklyReportAt: now.toISOString() } as unknown as Json,
+            createdAt: artifact.createdAt,
+          });
+        }
       }
     } catch (error) {
       // One bad set must not stop the rest of the schedule.

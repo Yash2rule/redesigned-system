@@ -55,6 +55,8 @@ beforeAll(async () => {
       brand: { name: "Northline Studio", color: "#0f766e" },
       alertEmails: ["ops@northline.example"],
       history: [],
+      // As the check route sets it: the weekly clock starts at creation.
+      lastWeeklyReportAt: new Date().toISOString(),
     } as never,
     createdAt: new Date().toISOString(),
   });
@@ -123,3 +125,79 @@ describe("the alert lifecycle", () => {
     expect(report.alertsSkipped.join(" ")).toContain("no alert address");
   });
 });
+
+describe("the weekly summary", () => {
+  it("does not arrive the day after someone read the results on screen", async () => {
+    const report = await runScheduledChecks(new Date(Date.now() + 86_400_000));
+    expect(report.weeklyReportsSent).toBe(0);
+  });
+
+  it("arrives a week later, and then not again until the week after", async () => {
+    const { WEEKLY_REPORT_INTERVAL_MS } = await import("./schedule.ts");
+    const week = Date.now() + WEEKLY_REPORT_INTERVAL_MS + 1000;
+    const before = mail.sent.length;
+
+    let report = await runScheduledChecks(new Date(week));
+    expect(report.weeklyReportsSent).toBeGreaterThanOrEqual(1);
+    expect(mail.sent.length).toBeGreaterThan(before);
+    expect(mail.sent[mail.sent.length - 1]?.subject).toContain("Weekly check");
+
+    // The next day is not a new week. A "weekly" report arriving daily is a
+    // daily report nobody asked for.
+    report = await runScheduledChecks(new Date(week + 86_400_000));
+    expect(report.weeklyReportsSent).toBe(0);
+  });
+
+  it("names what needs attention in the subject", async () => {
+    const { weeklyReportEmail } = await import("./notify.ts");
+    const healthySet = {
+      checkedAt: new Date().toISOString(),
+      monitors: [{ hostname: "a.com", worst: "ok", findings: [], tls: null, domain: {} }],
+      summary: { total: 3, critical: 0, warning: 0, healthy: 3 },
+      limitations: [],
+    } as never;
+    expect(weeklyReportEmail(healthySet, "Northline", "https://x/s/1").subject).toContain(
+      "all 3 sites healthy",
+    );
+
+    const brokenSet = {
+      checkedAt: new Date().toISOString(),
+      monitors: [
+        {
+          hostname: "a.com",
+          worst: "critical",
+          findings: [{ id: "down", severity: "critical", title: "Not responding", detail: "", action: "" }],
+          tls: null,
+          domain: {},
+        },
+      ],
+      summary: { total: 3, critical: 1, warning: 0, healthy: 2 },
+      limitations: [],
+    } as never;
+    const broken = weeklyReportEmail(brokenSet, "Northline", "https://x/s/1");
+    expect(broken.subject).toContain("1 of 3 sites need attention");
+    expect(broken.text).toContain("Not responding");
+  });
+
+  it("calls out anything expiring soon", async () => {
+    const { weeklyReportEmail } = await import("./notify.ts");
+    const set = {
+      checkedAt: new Date().toISOString(),
+      monitors: [
+        {
+          hostname: "a.com",
+          worst: "warning",
+          findings: [],
+          tls: { daysRemaining: 12 },
+          domain: { daysRemaining: 40 },
+        },
+      ],
+      summary: { total: 1, critical: 0, warning: 1, healthy: 0 },
+      limitations: [],
+    } as never;
+    const message = weeklyReportEmail(set, "Northline", "https://x/s/1");
+    expect(message.text).toContain("Expiring soon");
+    expect(message.text).toContain("certificate in 12 days");
+    expect(message.text).toContain("domain in 40 days");
+  });
+})

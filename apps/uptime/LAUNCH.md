@@ -30,7 +30,7 @@ client the link.
 | Plan | Price | What it is |
 | --- | --- | --- |
 | Manual check | Free | Up to 8 domains, no account, the full check. |
-| Studio | $29/mo | 25 monitors, branded status page, change alerts. |
+| Studio | $29/mo | 25 monitors, branded status page, change alerts, weekly summary. |
 | Agency | $79/mo | 150 monitors, your logo and your own domain, per-client pages, hourly re-checks. |
 
 Daily re-checks run for every monitor set, free ones included. The paid tiers
@@ -91,6 +91,12 @@ Suggested subreddits: r/webdev, r/agency, r/web_design, r/ExperiencedDevs
 >   running against your own clients. It refreshes once a day on a schedule and
 >   keeps the last fortnight, so the link you sent a client stays current. It
 >   stops re-checking after 30 days with nobody looking.
+>
+> On email: you hear when something *changes* — a site breaking, a certificate
+> crossing a threshold, something recovering — and a summary once a week. A
+> site that stays down does not generate a daily reminder. A monitor that cries
+> wolf every morning gets filtered, and then the one that matters gets filtered
+> too.
 >
 > Free check is genuinely the full check, not a teaser. Not taking payments
 > yet.

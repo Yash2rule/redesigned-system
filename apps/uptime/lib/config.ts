@@ -38,9 +38,9 @@ export const config: ProbeConfig = {
       features: [
         "Up to 25 monitors",
         "Branded status page on our domain",
-        "Email alert when something changes — and only then",
+        "Told when something changes — and only then",
+        "A weekly summary, once a week",
       ],
-      planned: ["Weekly summary email"],
     },
     {
       id: "agency",
@@ -58,7 +58,7 @@ export const config: ProbeConfig = {
       planned: [
         "Your logo and your own domain on the status page",
         "Hourly re-checks instead of daily",
-        "The weekly summary emailed to each client",
+        "A separate summary per client, not per monitor set",
       ],
     },
   ],
