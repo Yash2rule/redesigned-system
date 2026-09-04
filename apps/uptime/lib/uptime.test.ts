@@ -1,7 +1,5 @@
 import { createServer } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { checkHttp, checkTls, parseRdap } from "./checks.ts";
@@ -9,9 +7,7 @@ import type { Severity } from "./monitor.ts";
 import { isPublicAddress } from "./safe-url.ts";
 import { parseTargets, runMonitor } from "./monitor.ts";
 import { useTempStore } from "../../../tests/helpers.ts";
-
-const cert = (name: string) =>
-  readFileSync(path.join(process.cwd(), "fixtures", "certs", name));
+import { testCert, type TestCertName } from "../../../tests/certs.ts";
 
 // The SSRF guard has to be relaxed to reach a loopback test server; the guard
 // only honours this under NODE_ENV=test, which vitest sets.
@@ -30,9 +26,10 @@ async function startHttp(
   return (server.address() as AddressInfo).port;
 }
 
-async function startHttps(certName: string, keyName: string): Promise<number> {
+async function startHttps(name: TestCertName): Promise<number> {
+  const { cert, key } = await testCert(name);
   const server = createHttpsServer(
-    { cert: cert(certName), key: cert(keyName) },
+    { cert, key },
     (_req, res) => {
       res.statusCode = 200;
       res.end("ok");
@@ -161,29 +158,33 @@ describe("checkHttp", () => {
 
 describe("checkTls", () => {
   it("reads a valid certificate off a real handshake", async () => {
-    const port = await startHttps("healthy-cert.pem", "healthy-key.pem");
+    const port = await startHttps("healthy");
     const result = await checkTls("localhost", port);
 
     expect(result.subject).toBe("localhost");
     expect(result.validTo).toBeTruthy();
-    expect(result.daysRemaining).toBeGreaterThan(300);
+    expect(result.daysRemaining).toBeGreaterThan(3000);
     expect(result.hostnameMatches).toBe(true);
     expect(result.altNames).toContain("localhost");
   });
 
   it("reports a certificate nearing expiry rather than refusing to look", async () => {
-    const port = await startHttps("expiring-cert.pem", "expiring-key.pem");
+    const port = await startHttps("expiring");
     const result = await checkTls("localhost", port);
 
     // Self-signed, so it does not validate — but we still read the dates,
     // which is the entire point of the check.
-    expect(result.daysRemaining).toBeLessThanOrEqual(10);
-    expect(result.daysRemaining).toBeGreaterThanOrEqual(0);
+    //
+    // Exactly 5: the fixture is generated at notAfter = now + 5.5 days, so the
+    // floor is 5 no matter when this runs. Asserting the exact number is what
+    // stops the certificate ever drifting back to a fixed date — a fixed date
+    // would pass today and fail on some morning nobody planned for.
+    expect(result.daysRemaining).toBe(5);
     expect(result.validTo).toBeTruthy();
   });
 
   it("notices when the certificate does not cover the hostname", async () => {
-    const port = await startHttps("wrongname-cert.pem", "wrongname-key.pem");
+    const port = await startHttps("wrongname");
     const result = await checkTls("localhost", port);
     expect(result.hostnameMatches).toBe(false);
     expect(result.altNames).toContain("other.example");

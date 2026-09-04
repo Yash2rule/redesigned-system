@@ -17,17 +17,18 @@
     "seed": "node --experimental-strip-types scripts/seed-demo-data.mts"
   },
   "devDependencies": {
+    "@probes/analytics": "workspace:*",
+    "@probes/app-kit": "workspace:*",
+    "@probes/billing": "workspace:*",
+    "@probes/core": "workspace:*",
+    "@probes/email": "workspace:*",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "selfsigned": "^5.5.0",
     "turbo": "^2.10.12",
     "typescript": "5.9.3",
-    "vitest": "^3.2.4",
-    "@probes/core": "workspace:*",
-    "@probes/app-kit": "workspace:*",
-    "@probes/billing": "workspace:*",
-    "@probes/analytics": "workspace:*",
-    "@probes/email": "workspace:*"
+    "vitest": "^3.2.4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

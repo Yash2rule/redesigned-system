@@ -12,3 +12,8 @@ dist/
 .DS_Store
 coverage/
 tmp/
+
+# Key material never belongs in here. Test certificates are generated at
+# test time by tests/certs.ts.
+*.pem
+*.key
