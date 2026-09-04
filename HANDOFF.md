@@ -319,6 +319,11 @@ Suggested names, all currently placeholders in the code:
 Buy at any registrar, add to the Vercel project, follow Vercel's DNS
 instructions. Then set `APP_BASE_URL` per project.
 
+`APP_BASE_URL` is already set on all five, to their `*.vercel.app` addresses,
+so the links inside emails and status pages are absolute today rather than
+relative and useless. Repoint it the day a real domain lands:
+`APP_BASE_URL=https://offerdecoder.in pnpm provision --apps=offer-decoder`.
+
 **Do not skip the email addresses.** They are in every footer, every FAQ, and
 in the support widget's "I don't know, email us" fallback. An unread address
 there is the one dishonest thing in an otherwise honest product.
@@ -369,6 +374,13 @@ monitor set, which is what makes a status page you sent a client stay current.
 openssl rand -base64 24
 ```
 
+**Done.** A secret was generated and set on `redesigned-system-uptime` and
+`redesigned-system-freelancer-kit` — the same value on both, which is what
+item 11 needs. It was handed over in the session that set it rather than
+written down here. Verified live: `/api/cron/check` returns 401 with no
+header and 200 with it, and the authorised call refreshed 7 monitor sets;
+`/api/cron/reminders` behaves the same way.
+
 Without it `/api/cron/check` refuses every request, including Vercel's own —
 deliberately, because that endpoint makes outbound requests to arbitrary
 third-party domains and an open version of it is a request amplifier pointed at
@@ -412,41 +424,54 @@ once, not for your situation" — more useful, and still true.
 
 ---
 
-## 9. Two claims that could not be verified from the build machine — now both checked
+## 9. Two claims that could not be verified from the build machine — both now checked, one was broken
 
-Both are in the code and both were tested against recorded or local data. The
-build environment could not confirm either against the live internet, because
-its outbound requests go through a filtering proxy that returns 403 for most
-hosts and terminates TLS with its own certificate. **Both have now been run
-from the deployed app instead.** One passed and one did not.
+Both were tested against recorded or local data and neither could be confirmed
+against the live internet from the build environment, whose outbound requests
+go through a filtering proxy that returns 403 for most hosts and terminates TLS
+with its own certificate. **Both have now been run from the deployed app.** TLS
+was fine. RDAP was not, and is fixed.
 
-**a. RDAP domain expiry (`apps/uptime`) — checked live, and it is half broken.**
-Run against the deployed app, not the build sandbox:
+**a. RDAP domain expiry (`apps/uptime`) — was broken, now fixed and working.**
 
-| What was tried | Result |
+The claim was true of the parsing and false of everything around it.
+`rdap.org`, the redirector the code used, returns 403 to requests from Vercel,
+so every lookup in production failed. The earlier session blamed the build
+sandbox's filtering proxy; that was the wrong conclusion — it reproduced in
+production, and pointing the same app at an authoritative registry returned a
+real registrar and expiry immediately.
+
+`checkDomain` now reads IANA's own registry (`data.iana.org/rdap/dns.json`),
+which maps every TLD to the RDAP server that owns it, caches it for a day, and
+queries that server directly. Verified against the deployed app:
+
+| Domain | Result |
 | --- | --- |
-| default `https://rdap.org/domain` from Vercel | `403` — reported as "the registry did not answer over RDAP (403)" |
-| `RDAP_BASE_URL=https://rdap.verisign.com/com/v1/domain`, same app, same domain | real answer: registrar MarkMonitor, expiry 2026-10-09, three statuses, `source: "rdap"` |
+| github.com | expiry 2026-10-09, MarkMonitor |
+| zerodha.com | expiry 2033-02-17, Cloudflare |
+| amazon.in | expiry 2027-02-11, MarkMonitor |
+| irctc.co.in | expiry 2027-06-04, GoDaddy |
 
-So the **parsing is fine and the bootstrap is not**. `rdap.org` is a redirector,
-and it 403s from Vercel's network — the earlier 403 was blamed on the build
-environment's filtering proxy, and that was the wrong conclusion; it reproduces
-in production. Point the app at an authoritative registry and a real expiry
-date comes straight back.
+**Two things that came out of fixing it.** First, `.in` was never the problem.
+It answers in full, `.co.in` included, so the FAQ and the launch content that
+named it as a registry publishing "thin records or none" were saying something
+untrue to customers, and have been corrected.
 
-**Do not just set `RDAP_BASE_URL` and call it done.** That variable is a single
-base for every lookup, and the Verisign endpoint above serves `.com`/`.net`
-only. Set it globally and a `.in` domain — the audience this probe is aimed at —
-gets a 404, which the code reports as *"No RDAP record. The domain may be
-unregistered."* That is a confident, wrong sentence about somebody's live
-domain, and it is worse than the honest failure it replaces. The diagnostic
-variable was removed from the project after this test for exactly that reason.
+Second, `irctc.co.in` is there because it exercises a separate bug the fix
+uncovered: the registrable domain was always the last two labels, so
+`status.acme.co.in` was looked up as `co.in` — a question about the registry
+rather than about the customer's domain, on exactly the TLD shape this
+probe's audience uses. There is now a small second-level-suffix table for the
+three-label cases. It is not the public suffix list and does not pretend to be;
+a suffix missing from it degrades to "unknown", never to a wrong date.
 
-The real fix is per-TLD bootstrap: read IANA's registry
-(`https://data.iana.org/rdap/dns.json`), pick the RDAP base for the domain's
-TLD, cache it. Roughly thirty lines in `apps/uptime/lib/checks.ts` around the
-`base` on line 448. Until that is done, the uptime launch post must not claim
-domain-expiry monitoring works — the TLS half does, the domain half does not.
+`RDAP_BASE_URL` still overrides the lookup, and its doc comment now carries the
+warning that cost an experiment to learn: one base serves one registry, so
+pinning it to a `.com` server makes every `.in` domain report as possibly
+unregistered. It is for tests and single-TLD deployments, not a fix.
+
+**The uptime launch post can now claim domain-expiry monitoring.** It could
+not before.
 
 **b. Live TLS against real hosts — confirmed working.** A check from the
 deployed app against `github.com` returned the real certificate: issuer Sectigo
@@ -454,8 +479,8 @@ Limited, subject `github.com`, `hostnameMatches: true`, alt names
 `github.com`/`www.github.com`, valid to 2026-11-29, 86 days remaining. Nothing
 was substituted and nothing was guessed. This claim is safe to make publicly.
 
-One of these is now a known bug with a known cause and a known fix, and the
-other is settled. That is what running them live bought.
+Neither is unverified any more. One was a real bug in production that no test
+could have caught, because the thing that was broken was which host got asked.
 
 ---
 
@@ -495,6 +520,12 @@ Actions:
 | `CRON_SECRET` | the same value you set in the Vercel projects |
 | `UPTIME_URL` | `https://redesigned-system-uptime.vercel.app` |
 | `FREELANCER_URL` | `https://redesigned-system-freelancer-kit.vercel.app` |
+
+Two of those three are settled: the URLs are filled in above, and `CRON_SECRET`
+is the value already set on both Vercel projects and handed over with it — the
+GitHub secret has to be the same string. Adding repository secrets needs admin
+access this session did not have, so those three entries are the one part of
+this item still waiting on you.
 
 Then run it once by hand (Actions → Scheduled checks → Run workflow) to confirm
 a 200 before trusting the schedule. The endpoints are idempotent and both are
