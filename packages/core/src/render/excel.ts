@@ -33,32 +33,26 @@ export async function renderWorkbook(spec: WorkbookSpec): Promise<Buffer> {
     // Excel forbids : \ / ? * [ ] in sheet names and caps them at 31 chars.
     const sheet = workbook.addWorksheet(sheetSpec.name.replace(/[:\\/?*[\]]/g, "-").slice(0, 31));
 
-    let headerRowIndex = 1;
     for (const note of sheetSpec.notes ?? []) {
       const row = sheet.addRow([note]);
       row.font = { bold: true, size: 10, color: { argb: "FF6B7280" } };
-      headerRowIndex += 1;
     }
-    if ((sheetSpec.notes?.length ?? 0) > 0) {
-      sheet.addRow([]);
-      headerRowIndex += 1;
-    }
+    if ((sheetSpec.notes?.length ?? 0) > 0) sheet.addRow([]);
 
-    sheet.columns = sheetSpec.columns.map((c) => ({
-      header: c.header,
-      key: c.key,
-      width: c.width ?? Math.max(12, c.header.length + 4),
-      style: c.numFmt ? { numFmt: c.numFmt } : {},
-    }));
+    // Configure the columns one at a time rather than assigning `sheet.columns`.
+    // That setter writes a header row at row 1, on top of whatever is already
+    // there — which silently ate the first note, and the splice that tried to
+    // undo it deleted the overwritten row and left a blank one behind. Setting
+    // width, key and style per column touches no cells.
+    sheetSpec.columns.forEach((c, index) => {
+      const column = sheet.getColumn(index + 1);
+      column.key = c.key;
+      column.width = c.width ?? Math.max(12, c.header.length + 4);
+      if (c.numFmt) column.style = { numFmt: c.numFmt };
+    });
 
-    // Setting `columns` writes the header at row 1; when notes pushed it down,
-    // re-emit the header where it belongs.
-    if (headerRowIndex > 1) {
-      sheet.spliceRows(1, 1);
-      sheet.insertRow(headerRowIndex, sheetSpec.columns.map((c) => c.header));
-    }
-
-    const header = sheet.getRow(headerRowIndex);
+    const header = sheet.addRow(sheetSpec.columns.map((c) => c.header));
+    const headerRowIndex = header.number;
     header.font = { bold: true };
     header.fill = {
       type: "pattern",

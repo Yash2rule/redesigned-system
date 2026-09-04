@@ -36,6 +36,13 @@ export async function renderPdf(spec: PdfDocumentSpec): Promise<Buffer> {
     size: "A4",
     margins: { top: 56, bottom: 72, left: 56, right: 56 },
     info: { Title: spec.title },
+    // Required for the disclaimer pass below. Without it pdfkit writes pages
+    // out as it goes and `bufferedPageRange()` only ever describes the last
+    // one — a three-page document reports {start: 2, count: 1}, so the
+    // disclaimer lands on the final page alone and the footer reads
+    // "page 1 of 1". On the tax-adjacent probes that is the difference between
+    // a document that carries its caveat and one that does not.
+    bufferPages: true,
   });
 
   const chunks: Buffer[] = [];
@@ -144,21 +151,39 @@ export async function renderPdf(spec: PdfDocumentSpec): Promise<Buffer> {
   }
 
   // Disclaimer on every page. Non-negotiable for the tax-adjacent probes.
+  //
+  // Two pdfkit traps here, and the second one is why documents used to come out
+  // with blank pages on the end. Writing text below the bottom margin is what
+  // "in the footer" means, but pdfkit reads any text that crosses the margin as
+  // content overflowing and helpfully starts a new page — which then gets its
+  // own footer, and so on. A one-paragraph document rendered as three pages.
+  // Dropping the bottom margin to zero for the duration of the write is the
+  // documented way to say "this is a footer, do not paginate it"; lineBreak
+  // false stops a long disclaimer wrapping into the same trap.
   const range = doc.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i += 1) {
     doc.switchToPage(i);
-    const bottom = doc.page.height - doc.page.margins.bottom + 18;
+    const marginBottom = doc.page.margins.bottom;
+    const bottom = doc.page.height - marginBottom + 18;
+    doc.page.margins.bottom = 0;
     doc
       .font("Helvetica")
       .fontSize(7)
       .fillColor(MUTED)
-      .text(spec.disclaimer, doc.page.margins.left, bottom, { width, align: "left" });
-    if (spec.footerBrand) {
-      doc.text(`${spec.footerBrand}  ·  page ${i - range.start + 1} of ${range.count}`, doc.page.margins.left, bottom + 18, {
+      .text(spec.disclaimer, doc.page.margins.left, bottom, {
         width,
         align: "left",
+        lineBreak: false,
       });
+    if (spec.footerBrand) {
+      doc.text(
+        `${spec.footerBrand}  ·  page ${i - range.start + 1} of ${range.count}`,
+        doc.page.margins.left,
+        bottom + 18,
+        { width, align: "left", lineBreak: false },
+      );
     }
+    doc.page.margins.bottom = marginBottom;
   }
 
   doc.end();
