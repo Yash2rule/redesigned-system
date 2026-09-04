@@ -268,6 +268,65 @@ Two things that run learned, both now fixed in the script:
 
 ---
 
+## 3a. The admin dashboard hung, and what it turned out to be
+
+Worth reading before you touch the store, because almost every plausible
+explanation here was wrong and the evidence is cheap to re-gather.
+
+**Symptom.** The dashboard returned in under a second on the first request
+after a deploy and then hung on every request after it, until the platform's
+300-second function limit. The four probes and the admin app's own API routes
+stayed fast throughout, which is what made it look like a database problem it
+was not: on Vercel every route is a separate process with its own connection
+pool, so "one route wedges and the rest are fine" is the normal shape of a
+per-process fault, not evidence about the database.
+
+**Cause.** `loadDashboard` read its four figures with `Promise.all` — four
+concurrent demands on a pool of three, in front of a shared pooler. The same
+four calls made one after another return in about 25 milliseconds together.
+Sequential is now what it does, and the page has run 15 consecutive times at
+about half a second.
+
+**What found it.** Nothing external could see the error: the 500 page hides
+it and runtime logs need a token this session did not have. A temporary
+endpoint that timed each store call separately and returned the real message
+turned "the page hangs" into "`getProbeStates` is cancelled with 57014 in 48
+milliseconds", and everything followed from that. The endpoint has been
+removed — it reported internal error text to anyone with the admin cookie —
+but it is four lines to write again, and it is the tool to reach for.
+
+**Two of the fixes attempted along the way were wrong, and both are worth
+knowing about:**
+
+- A `statement_timeout` set as a bare number of milliseconds, which is how
+  postgres.js types it, was applied as something far smaller and cancelled
+  every statement within tens of milliseconds. Spelling it `"60s"` behaved and
+  also failed the type check. There is now no server-side statement timeout; a
+  client-side deadline in `guard` bounds the wait instead, in one place and in
+  units nothing reinterprets.
+- Replacing the connection pool whenever a call missed its deadline read
+  sensibly and made things strictly worse: the pool is shared, so tearing it
+  down under the other three in-flight reads turned one slow query into four
+  failed ones. The deadline now only bounds the wait and repairs nothing.
+
+**What survives from it.** Every store call has a ten-second client-side
+deadline, so the failure mode is an error page in ten seconds rather than a
+spinner for three hundred. The migration is sent with `.simple()`, which is
+required for a multi-statement script and matters more behind a transaction
+pooler, and a failed migration no longer caches itself as a promise that never
+settles — which is what made the failure total and identical rather than
+intermittent, and why a redeploy appeared to fix it every time.
+
+**One piece of drift to clear.** Iterating on this exhausted Vercel's free
+limit of 100 API-created deployments per day, so `ledger`, `uptime` and
+`freelancer-kit` are still running the build from before the last two store
+commits. All three were re-tested afterwards and are healthy — the fault was
+only ever in the dashboard's parallel reads — but they are behind. One
+`pnpm provision` once the quota resets aligns them, and a merge to `main`
+would do it through the Git integration instead, which is a separate quota.
+
+---
+
 ## 4. Payment keys
 
 **Why:** Until these exist, every buy button records purchase intent and tells
