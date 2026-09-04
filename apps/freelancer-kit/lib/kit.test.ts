@@ -425,3 +425,45 @@ describe("routes", () => {
     expect(response.status).toBe(404);
   });
 });
+
+describe("GST rate validation applies on every path", () => {
+  const foreign = {
+    name: "Helios GmbH",
+    address: "Rosenthaler Str 40, Berlin",
+    gstin: "",
+    stateCode: "",
+    country: "Germany",
+  };
+
+  it("refuses an invented rate on a domestic invoice", () => {
+    expect(() => buildInvoice(baseInvoice({ gstRatePct: 500 }))).toThrow(/not a GST rate/);
+  });
+
+  it("refuses an invented rate on an export invoice too", () => {
+    // The guard used to sit in the `else if` after the export branch, so an
+    // export charging integrated tax was never checked at all — a 500% IGST
+    // line would have rendered onto a document somebody acts on.
+    expect(() =>
+      buildInvoice(baseInvoice({ client: foreign, gstRatePct: 500 })),
+    ).toThrow(/not a GST rate/);
+    expect(() =>
+      buildInvoice(baseInvoice({ client: foreign, gstRatePct: -18 })),
+    ).toThrow(/not a GST rate/);
+  });
+
+  it("still accepts every real rate, export or not", () => {
+    for (const gstRatePct of [0, 5, 12, 18, 28]) {
+      expect(() => buildInvoice(baseInvoice({ gstRatePct }))).not.toThrow();
+      expect(() => buildInvoice(baseInvoice({ client: foreign, gstRatePct }))).not.toThrow();
+    }
+  });
+
+  it("charges the validated rate as IGST on an export with tax", () => {
+    const result = buildInvoice(
+      baseInvoice({ client: foreign, gstRatePct: 18, exportUnderLut: false }),
+    );
+    const igst = result.taxLines.find((line) => line.label === "IGST");
+    expect(igst?.ratePct).toBe(18);
+    expect(igst?.amountMinor).toBe(Math.round((100_000_00 * 18) / 100));
+  });
+});

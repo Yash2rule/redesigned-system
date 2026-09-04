@@ -105,6 +105,16 @@ export function buildInvoice(input: InvoiceInput): InvoiceResult {
   if (input.items.length === 0) {
     throw new UserFacingError("Add at least one line item.", 400);
   }
+  // Checked here, before any branch, rather than on the domestic path alone.
+  // Tucked into the domestic `else if` it left the export-with-tax branch
+  // unguarded, so an invoice charging 500% IGST would generate happily — and
+  // an invoice is a document someone acts on.
+  if (!GST_RATES.includes(input.gstRatePct)) {
+    throw new UserFacingError(
+      `${input.gstRatePct}% is not a GST rate. The rates are 0, 5, 12, 18 and 28 percent; most professional services are 18.`,
+      400,
+    );
+  }
 
   const supplierGstin = input.supplier.gstin.trim().toUpperCase();
   const clientGstin = input.client.gstin.trim().toUpperCase();
@@ -179,11 +189,6 @@ export function buildInvoice(input: InvoiceInput): InvoiceResult {
     }
     warnings.push(
       "For export of services to be zero-rated, payment must be received in convertible foreign exchange (or INR where the RBI permits it), and the recipient must be outside India. Keep the FIRC or bank advice.",
-    );
-  } else if (!GST_RATES.includes(input.gstRatePct)) {
-    throw new UserFacingError(
-      `${input.gstRatePct}% is not a GST rate. The rates are 0, 5, 12, 18 and 28 percent; most professional services are 18.`,
-      400,
     );
   } else {
     documentType = "tax-invoice";

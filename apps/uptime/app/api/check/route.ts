@@ -114,6 +114,9 @@ export async function POST(request: Request): Promise<Response> {
         brand,
         clients,
         history: [],
+        // The staleness clock. Fixed at creation and never rewritten, so a set
+        // nobody comes back to does eventually stop being re-checked.
+        firstSeenAt: new Date().toISOString(),
         alertEmails: alertEmail ? [alertEmail] : [],
         // The first weekly summary lands a week from now — they have just
         // read these results on screen.

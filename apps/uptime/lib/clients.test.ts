@@ -4,6 +4,7 @@ import type { MonitorResult, Severity } from "./monitor.ts";
 import { clientAssignments, hasClients, summariseByClient } from "./clients.ts";
 import { buildStatusReport, forClient } from "./report.ts";
 import { normaliseLogoUrl } from "./brand.ts";
+import { useTempStore } from "../../../tests/helpers.ts";
 
 const monitor = (hostname: string, worst: Severity): MonitorResult =>
   ({
@@ -198,5 +199,77 @@ describe("buildStatusReport scoped to a client", () => {
 
   it("refuses to render a client that is not in the check", async () => {
     await expect(buildStatusReport(result, "Nobody")).rejects.toThrow(/No client called/);
+  });
+});
+
+describe("what a scheduled re-check must carry across", () => {
+  /** A stored monitor set, as the check route would have written it. */
+  const storedSet = (over: Record<string, unknown> = {}) => ({
+    monitors: [monitor("localhost", "ok")],
+    checkedAt: new Date().toISOString(),
+    summary: { total: 1, critical: 0, warning: 0, healthy: 1 },
+    limitations: [],
+    brand: { name: "Northline", color: "#0f766e" },
+    clients: { localhost: "Acme" },
+    history: [],
+    alertEmails: [],
+    firstSeenAt: new Date().toISOString(),
+    ...over,
+  });
+
+  it("keeps the client assignments across a re-check", async () => {
+    // Regression: `merged` spread the fresh CheckRunResult and copied brand,
+    // alerts and history — but not `clients`. Per-client grouping and every
+    // ?client=… PDF link a customer had already sent out died at the first
+    // scheduled re-check, silently.
+    const store = useTempStore();
+    try {
+      const { getStore } = await import("@probes/core/server");
+      const { runScheduledChecks } = await import("./schedule.ts");
+      await getStore().saveArtifact({
+        id: "set-1",
+        probe: "uptime",
+        sessionId: "s1",
+        payload: storedSet() as never,
+        createdAt: new Date().toISOString(),
+      });
+
+      await runScheduledChecks(new Date());
+
+      const after = await getStore().getArtifact("set-1");
+      const set = after?.payload as unknown as { clients?: Record<string, string>; brand?: unknown };
+      expect(set.clients).toEqual({ localhost: "Acme" });
+      expect(set.brand).toEqual({ name: "Northline", color: "#0f766e" });
+    } finally {
+      store.cleanup();
+    }
+  });
+
+  it("expires a set from a clock the re-check does not reset", async () => {
+    // Staleness used to be read from `checkedAt`, which this very function
+    // rewrites — so a set kept resetting its own clock and STALE_AFTER_DAYS
+    // never expired anything. `firstSeenAt` is fixed at creation.
+    const store = useTempStore();
+    try {
+      const { getStore } = await import("@probes/core/server");
+      const { runScheduledChecks, STALE_AFTER_DAYS } = await import("./schedule.ts");
+      const longAgo = new Date(Date.now() - (STALE_AFTER_DAYS + 5) * 86_400_000).toISOString();
+
+      await getStore().saveArtifact({
+        id: "old-set",
+        probe: "uptime",
+        sessionId: "s1",
+        // Freshly re-checked, but created long ago: exactly the state the old
+        // code could never expire.
+        payload: storedSet({ firstSeenAt: longAgo, checkedAt: new Date().toISOString() }) as never,
+        createdAt: longAgo,
+      });
+
+      const report = await runScheduledChecks(new Date());
+      expect(report.skippedStale).toBe(1);
+      expect(report.refreshed).toBe(0);
+    } finally {
+      store.cleanup();
+    }
   });
 });

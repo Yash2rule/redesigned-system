@@ -36,6 +36,14 @@ export type MonitorSet = CheckRunResult & {
   alertEmails?: string[];
   /** When the weekly summary last went out, so it goes out weekly not daily. */
   lastWeeklyReportAt?: string;
+  /**
+   * When this set was created, carried across every re-check.
+   *
+   * Staleness cannot be read from `checkedAt`, because the scheduler rewrites
+   * that on every run — a set would keep resetting its own clock and never
+   * expire. This one never moves.
+   */
+  firstSeenAt?: string;
 };
 
 /** Roughly a fortnight of daily checks — enough to see a trend, small to store. */
@@ -107,8 +115,11 @@ export async function runScheduledChecks(
 
   const live = artifacts.filter((artifact) => {
     const set = artifact.payload as unknown as MonitorSet;
-    const lastSeen = Date.parse(set.checkedAt ?? artifact.createdAt);
-    if (!Number.isFinite(lastSeen) || lastSeen < cutoff) {
+    // Deliberately NOT `set.checkedAt`: this function rewrites that field on
+    // every run, so measuring staleness from it meant a set refreshed itself
+    // into permanent life and STALE_AFTER_DAYS never expired anything.
+    const born = Date.parse(set.firstSeenAt ?? artifact.createdAt);
+    if (!Number.isFinite(born) || born < cutoff) {
       report.skippedStale += 1;
       return false;
     }
@@ -141,12 +152,17 @@ export async function runScheduledChecks(
         (previous.alertEmails?.length ?? 0) > 0 &&
         now.getTime() - lastWeekly >= WEEKLY_REPORT_INTERVAL_MS;
 
+      // Everything the check itself does not produce has to be carried across
+      // explicitly, because `next` is a fresh CheckRunResult. Forgetting one is
+      // silent: the status page simply stops doing something it used to.
       const merged: MonitorSet = {
         ...next,
         brand: previous.brand,
+        clients: previous.clients,
         alertEmails: previous.alertEmails,
         history: appendHistory(previous, next),
         lastWeeklyReportAt: previous.lastWeeklyReportAt,
+        firstSeenAt: previous.firstSeenAt ?? artifact.createdAt,
       };
       await store.saveArtifact({
         id: artifact.id,
