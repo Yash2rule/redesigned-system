@@ -423,11 +423,102 @@ export function parseRdap(body: unknown): Omit<DomainCheck, "error"> {
 }
 
 /**
+ * Second-level suffixes where the registrable domain is three labels, not two.
+ *
+ * A deliberate subset, not a public suffix list. Pulling in the real PSL is
+ * ~200KB that changes monthly, for a probe whose visitors are overwhelmingly
+ * on `.in`, `.co.in` and a handful of gTLDs. These are the ones that would
+ * otherwise be looked up as "co.in" or "co.uk" — a query about the registry
+ * itself rather than about anybody's domain. If a suffix is missing here the
+ * lookup degrades to "unknown", which is the honest failure, never a wrong
+ * date. Add to it when a real domain lands in the wrong bucket.
+ */
+const MULTIPART_SUFFIXES = new Set([
+  "co.in", "net.in", "org.in", "firm.in", "gen.in", "ind.in", "ac.in", "edu.in", "res.in", "gov.in",
+  "co.uk", "org.uk", "ac.uk", "gov.uk", "net.uk", "sch.uk", "me.uk", "plc.uk",
+  "com.au", "net.au", "org.au", "edu.au", "gov.au", "asn.au", "id.au",
+  "co.nz", "net.nz", "org.nz", "co.za", "org.za", "com.br", "com.sg", "com.my",
+]);
+
+/**
+ * The registrable domain — what RDAP is queried on. `www.acme.co.in` is
+ * `acme.co.in`, not `co.in`.
+ */
+export function registrableDomain(hostname: string): string | null {
+  const labels = hostname.toLowerCase().split(".").filter(Boolean);
+  if (labels.length < 2) return null;
+  const lastTwo = labels.slice(-2).join(".");
+  if (MULTIPART_SUFFIXES.has(lastTwo)) {
+    return labels.length >= 3 ? labels.slice(-3).join(".") : null;
+  }
+  return lastTwo;
+}
+
+type BootstrapService = [string[], string[]];
+
+/**
+ * IANA publishes which RDAP server is authoritative for each TLD. Parsing is
+ * split out from fetching so it can be tested without a network.
+ */
+export function parseRdapBootstrap(body: unknown): Map<string, string> {
+  const map = new Map<string, string>();
+  const services = (body as { services?: unknown })?.services;
+  if (!Array.isArray(services)) return map;
+  for (const service of services as BootstrapService[]) {
+    if (!Array.isArray(service) || service.length < 2) continue;
+    const [tlds, urls] = service;
+    if (!Array.isArray(tlds) || !Array.isArray(urls)) continue;
+    // Registries list both http and https; take the secure one where offered.
+    const url = urls.find((u) => typeof u === "string" && u.startsWith("https://")) ?? urls[0];
+    if (typeof url !== "string") continue;
+    for (const tld of tlds) {
+      if (typeof tld === "string" && tld) map.set(tld.toLowerCase(), url.endsWith("/") ? url : `${url}/`);
+    }
+  }
+  return map;
+}
+
+const BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json";
+const BOOTSTRAP_TTL_MS = 24 * 60 * 60 * 1000;
+let bootstrapCache: { fetchedAt: number; map: Map<string, string> } | null = null;
+
+/** Exposed so tests can start from a known state. */
+export function resetRdapBootstrap(): void {
+  bootstrapCache = null;
+}
+
+async function rdapBaseFor(tld: string): Promise<string | null> {
+  if (bootstrapCache && Date.now() - bootstrapCache.fetchedAt < BOOTSTRAP_TTL_MS) {
+    return bootstrapCache.map.get(tld) ?? null;
+  }
+  const response = await fetch(BOOTSTRAP_URL, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`IANA's RDAP registry answered ${response.status}`);
+  const map = parseRdapBootstrap(await response.json());
+  if (map.size === 0) throw new Error("IANA's RDAP registry was empty or unreadable");
+  bootstrapCache = { fetchedAt: Date.now(), map };
+  return map.get(tld) ?? null;
+}
+
+/**
  * Domain expiry via RDAP — the free, public, IANA-run successor to WHOIS.
  *
- * Not every registry serves it: several ccTLDs, `.in` among them, return thin
- * records or nothing at all. When that happens we report "unknown" and say
- * why, rather than presenting a guessed date as fact.
+ * Queries the registry that IANA names as authoritative for the TLD, rather
+ * than going through a redirector. That is not a preference: `rdap.org`, the
+ * obvious redirector and what this used to use, returns 403 to requests from
+ * Vercel, so every lookup in production failed while the parsing underneath
+ * was working perfectly.
+ *
+ * `RDAP_BASE_URL` still overrides the lookup, and is a query base to which
+ * `/<domain>` is appended. Be careful with it: one base serves one registry,
+ * so pinning it to a `.com` server makes every `.in` domain look unregistered.
+ * It exists for tests and for pinning a single-TLD deployment, not as a fix.
+ *
+ * Not every registry serves RDAP: several ccTLDs, `.in` among them, return
+ * thin records or nothing at all. When that happens we report "unknown" and
+ * say why, rather than presenting a guessed date as fact.
  */
 export async function checkDomain(hostname: string): Promise<DomainCheck> {
   const unavailable = (message: string): DomainCheck => ({
@@ -440,14 +531,31 @@ export async function checkDomain(hostname: string): Promise<DomainCheck> {
     error: message,
   });
 
-  // RDAP is queried on the registrable domain, not the full hostname.
-  const labels = hostname.split(".").filter(Boolean);
-  if (labels.length < 2) return unavailable("That doesn't look like a domain name.");
-  const registrable = labels.slice(-2).join(".");
+  const registrable = registrableDomain(hostname);
+  if (!registrable) return unavailable("That doesn't look like a domain name.");
+  const tld = registrable.split(".").pop() as string;
 
-  const base = process.env.RDAP_BASE_URL?.trim() || "https://rdap.org/domain";
+  let query: string;
+  const override = process.env.RDAP_BASE_URL?.trim();
+  if (override) {
+    query = `${override.replace(/\/$/, "")}/${encodeURIComponent(registrable)}`;
+  } else {
+    let base: string | null;
+    try {
+      base = await rdapBaseFor(tld);
+    } catch (error) {
+      return unavailable(`Could not reach IANA's RDAP registry: ${(error as Error).message}`);
+    }
+    if (!base) {
+      return unavailable(
+        `.${tld} has no RDAP service listed with IANA, so expiry cannot be looked up. Several country registries don't publish it this way.`,
+      );
+    }
+    query = `${base}domain/${encodeURIComponent(registrable)}`;
+  }
+
   try {
-    const response = await fetch(`${base}/${encodeURIComponent(registrable)}`, {
+    const response = await fetch(query, {
       headers: { accept: "application/rdap+json" },
       signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
       redirect: "follow",

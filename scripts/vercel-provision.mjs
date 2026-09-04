@@ -12,6 +12,7 @@
  *   ... --dry-run                    # print what would change, touch nothing
  *   ... --verify-only                # skip create/env/deploy, just check health
  *   ... --sensitive                  # write env vars Vercel can never read back
+ *   ... --ref=some-branch            # build this ref instead of main
  *
  * THE TOKEN'S SCOPE MATTERS, AND YOU CANNOT READ IT OFF THE TOKEN. A token
  * narrowed to a single project answers 403 "You don't have permission to
@@ -79,6 +80,7 @@ const ENV_TYPE = flag("sensitive") ? "sensitive" : "encrypted";
 const TOKEN = process.env.VERCEL_TOKEN;
 const TEAM_ID = process.env.VERCEL_TEAM_ID;
 
+const REF = value("ref") ?? PRODUCTION_BRANCH;
 const only = value("apps");
 const targets = only ? APPS.filter((a) => only.split(",").includes(a.dir)) : APPS;
 
@@ -265,11 +267,11 @@ async function deploy(project, app) {
     gitSource: {
       type: "github",
       repoId: project.link?.repoId ?? REPO_ID,
-      ref: PRODUCTION_BRANCH,
+      ref: REF,
     },
   });
   if (status >= 300) throw new Error(`deploy ${app.project}: ${status} ${JSON.stringify(body)}`);
-  console.log(`  deploying ${body.id}`);
+  console.log(`  deploying ${body.id}${REF === PRODUCTION_BRANCH ? "" : ` from ${REF}`}`);
   return body.id;
 }
 
