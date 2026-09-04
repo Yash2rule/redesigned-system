@@ -70,3 +70,12 @@ export {
 export type { VisitorContext } from "./session.ts";
 
 export * as india from "./india/index.ts";
+
+export {
+  DEFAULT_THRESHOLDS,
+  MIN_PAID_TO_RANK_ON_PAYMENT,
+  ranksOnPayment,
+  recommend,
+  recommendAll,
+} from "./decide/index.ts";
+export type { FunnelCounts, Recommendation, Thresholds, Verdict } from "./decide/index.ts";

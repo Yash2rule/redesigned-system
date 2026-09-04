@@ -4,6 +4,7 @@ export { PricingBlock } from "./components/pricing.tsx";
 export { FaqSection } from "./components/faq.tsx";
 export { SiteFooter } from "./components/footer.tsx";
 export { ThanksPage, NotFoundPage } from "./components/thanks.tsx";
+export { RetiredPage } from "./components/retired.tsx";
 export { SupportWidget } from "./components/support-widget.tsx";
 export { UploadWidget } from "./components/upload-widget.tsx";
 export type { UploadWidgetProps } from "./components/upload-widget.tsx";

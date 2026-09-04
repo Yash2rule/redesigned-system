@@ -24,12 +24,15 @@ on:
     - cron: "7 6 * * *"
     # Invoice reminders once a day too; hourly would nag.
     - cron: "13 4 * * *"
+    # Read the funnel and apply the decision rules, after the day is over in
+    # India so a day's traffic is counted whole rather than split.
+    - cron: "41 20 * * *"
   workflow_dispatch:
     inputs:
       job:
         description: Which endpoint to ping
         type: choice
-        options: [uptime, reminders, both]
+        options: [uptime, reminders, decide, both]
         default: both
 
 jobs:
@@ -80,3 +83,47 @@ jobs:
             "${URL%/}/api/cron/reminders")
           echo "HTTP $code"; cat /tmp/out.json; echo
           [ "$code" = "200" ]
+
+      - name: Decide which probes live
+        # The autonomous validation pass. Reads the funnel, applies the rules,
+        # and records a verdict — but only where the sample supports one, and
+        # never over a decision a human made from the dashboard.
+        if: >-
+          github.event.schedule == '41 20 * * *' ||
+          contains(fromJSON('["decide","both"]'), inputs.job)
+        env:
+          URL: ${{ secrets.ADMIN_URL }}
+          SECRET: ${{ secrets.CRON_SECRET }}
+          DRY_RUN: ${{ vars.DECIDE_DRY_RUN }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$SECRET" ]; then
+            echo "::notice::ADMIN_URL or CRON_SECRET not set — skipping."
+            exit 0
+          fi
+          # Set the repository variable DECIDE_DRY_RUN to 1 to see what the
+          # rules would do without letting them do it. Worth using for the
+          # first few runs after traffic starts arriving.
+          # Written as an if, not `[ ... ] && ...`: the steps run under `set -e`,
+          # where a trailing test that is simply false fails the whole step.
+          query=""
+          if [ "$DRY_RUN" = "1" ]; then query="?dryRun=1"; fi
+          code=$(curl -sS -o /tmp/decide.json -w '%{http_code}' \
+            --max-time 120 --retry 2 --retry-delay 10 \
+            -H "Authorization: Bearer $SECRET" \
+            "${URL%/}/api/cron/decide$query")
+          echo "HTTP $code"; cat /tmp/decide.json; echo
+          [ "$code" = "200" ]
+          # Surface the verdicts in the run summary so the decision is readable
+          # without opening the dashboard.
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open("/tmp/decide.json"))
+          print("## Probe verdicts\n")
+          if d.get("dryRun"):
+              print("_Dry run — nothing was changed._\n")
+          print("| Probe | Verdict | Action | Why |")
+          print("| --- | --- | --- | --- |")
+          for p in d.get("probes", []):
+              r = p["recommendation"]
+              print(f"| {p['probe']} | **{r['verdict']}** | {p['action']} | {r['reason']} |")
+          PY

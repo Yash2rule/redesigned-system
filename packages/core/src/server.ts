@@ -40,3 +40,5 @@ export type {
 
 export { answerSupportQuestion, rankFaq, MIN_CONFIDENCE } from "./support/index.ts";
 export type { FaqEntry, SupportAnswer, SupportOptions } from "./support/index.ts";
+
+export { isRetired, clearRetiredCache, RETIRED_MESSAGE } from "./decide/retired.ts";
