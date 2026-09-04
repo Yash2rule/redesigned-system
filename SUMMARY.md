@@ -20,11 +20,10 @@
    claims, they were built: the offer comparison, saved client details, category
    corrections you can teach it once, the ledger's financial-year rollup, change
    alerts, the weekly summary, advance-tax reminders, and the invoice register.
-   What remains in `planned` — rendered under "Not built yet" — is three uptime
-   items that are deployment concerns (a custom domain, hourly crons, a
-   per-client report), not missing code. `tests/pricing-claims.test.ts` fails
-   the build if a claim ever drifts ahead of the product; it has caught four of
-   my own copy changes.
+   What remains in `planned` — rendered under "Not built yet" — is two uptime
+   items that are deployment concerns, a custom domain and hourly crons, not
+   missing code. `tests/pricing-claims.test.ts` fails the build if a claim ever
+   drifts ahead of the product; it has caught five of my own copy changes.
 6. **`apps/admin` compares all four funnels side by side**, counting distinct
    visitors per event, with a persisted kill/keep toggle. It ranks on
    result-to-email, and says on the page why: `paid` reads zero everywhere

@@ -367,9 +367,10 @@ token. Until then, do not describe hourly checks as available.
 
 **Every paid plan separates what works from what does not, and most of it now
 works.** Of the six unbuilt claims the audit found, all six were built rather
-than deleted. What is left in `planned` is three uptime items — a custom
-domain, hourly re-checks, and a per-client report — all of which need a Vercel
-plan or DNS rather than code, and all of which are covered in items 5 and 11.
+than deleted, as were the per-client summary and the agency logo. What is left
+in `planned` is two uptime items — a custom domain and hourly re-checks — and
+neither is code: one needs DNS and a certificate per customer, the other needs a
+cron tier Vercel Hobby does not offer. Both are covered in items 5 and 11.
 
 **The original audit note, for context.** An audit
 found six features listed on pricing pages that existed only in the copy —
