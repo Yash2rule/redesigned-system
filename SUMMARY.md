@@ -4,7 +4,8 @@
    Offer Decoder (Indian CTC → real in-hand, clause red flags, side-by-side comparison), Statement to
    Ledger (bank/UPI CSV → categorised ledger + Excel), Client Watch (uptime +
    SSL + domain expiry, white-label status page that re-checks daily, USD), Freelance Desk (GST invoice +
-   contract + advance-tax schedule).
+   contract + advance-tax schedule, with due-date reminders and a financial-year
+   invoice register).
 2. **They share one engine**: `packages/core` (ingestion, LLM abstraction,
    PDF/Excel, Indian tax and statutory tables, PII-redacting corpus, a Store
    with Postgres and file-backed implementations), plus `ui`, `billing`,
@@ -14,12 +15,16 @@
    paste an API key measures curiosity, not willingness to pay.
 4. **Nothing fakes payment.** With no keys the button says payments open this
    week and records email + plan + timestamp as purchase intent.
-5. **Two probes now have zero unbuilt claims.** An audit found six features
-   listed on pricing pages that existed only in the copy; four were built (offer
-   comparison, saved client details, category corrections, financial-year
-   rollup), the rest sit in a `planned` list rendered under "Not built yet", and
-   a test fails the build if a claim ever drifts ahead of the product again — it
-   has caught three of my own copy changes so far.
+5. **Three of the four probes have zero unbuilt claims.** An audit found six
+   pricing-page features that existed only in the copy. Rather than delete the
+   claims, they were built: the offer comparison, saved client details, category
+   corrections you can teach it once, the ledger's financial-year rollup, change
+   alerts, the weekly summary, advance-tax reminders, and the invoice register.
+   What remains in `planned` — rendered under "Not built yet" — is three uptime
+   items that are deployment concerns (a custom domain, hourly crons, a
+   per-client report), not missing code. `tests/pricing-claims.test.ts` fails
+   the build if a claim ever drifts ahead of the product; it has caught four of
+   my own copy changes.
 6. **`apps/admin` compares all four funnels side by side**, counting distinct
    visitors per event, with a persisted kill/keep toggle. It ranks on
    result-to-email, and says on the page why: `paid` reads zero everywhere

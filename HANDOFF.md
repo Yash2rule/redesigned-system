@@ -365,7 +365,13 @@ day. Either move that project to Pro, or point an external pinger (a GitHub
 Actions schedule works and is free) at `/api/cron/check` with the same bearer
 token. Until then, do not describe hourly checks as available.
 
-**Every paid plan now separates what works from what does not.** An audit
+**Every paid plan separates what works from what does not, and most of it now
+works.** Of the six unbuilt claims the audit found, all six were built rather
+than deleted. What is left in `planned` is three uptime items — a custom
+domain, hourly re-checks, and a per-client report — all of which need a Vercel
+plan or DNS rather than code, and all of which are covered in items 5 and 11.
+
+**The original audit note, for context.** An audit
 found six features listed on pricing pages that existed only in the copy —
 saved client details, emailed reports, category overrides, a financial-year
 rollup, and so on. One of them, the side-by-side offer comparison, was worth
