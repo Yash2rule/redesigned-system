@@ -16,7 +16,7 @@ Before anything else, prove it runs on your machine:
 ```bash
 pnpm install
 pnpm build          # 5 apps, ~60s cold
-pnpm test           # 436 tests, ~3s
+pnpm test           # 443 tests, ~3s
 cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
 ```
 
@@ -175,15 +175,20 @@ a real payment rail on, and budget for Pro if that is what it says.
 After deploying, set `DATABASE_URL` (item 1) on every project and
 `ADMIN_PASSWORD` (item 2) on admin, then redeploy.
 
+**Deployed and verified:** offer-decoder is live on Supabase — a real letter
+decoded end to end, six tables created on first request. `/api/health` reports
+`"database": true`, but note that only means `DATABASE_URL` is set and non-empty;
+it never opens a connection. Doing one real decode is what proves the string.
+
 **Record the URLs here when you have them:**
 
-| App | Preview URL | Production URL |
-| --- | --- | --- |
-| offer-decoder | | |
-| ledger | | |
-| uptime | | |
-| freelancer-kit | | |
-| admin | | |
+| App | Production URL |
+| --- | --- |
+| offer-decoder | https://redesigned-system-offer-decoder.vercel.app |
+| ledger | |
+| uptime | |
+| freelancer-kit | |
+| admin | |
 
 ---
 
