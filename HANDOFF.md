@@ -15,7 +15,7 @@ Before anything else, prove it runs on your machine:
 ```bash
 pnpm install
 pnpm build          # 5 apps, ~60s cold
-pnpm test           # 324 tests, ~3s
+pnpm test           # 335 tests, ~3s
 cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
 ```
 
@@ -128,6 +128,12 @@ openssl rand -base64 24
 ```
 
 Set it as `ADMIN_PASSWORD` on the `admin` project only. Minimum 8 characters.
+
+The dashboard is also where you reach the people who left an email: download
+the list as CSV, or write them a message. That flow is dry-run by default,
+de-duplicates anyone who left their address on several probes, shows the exact
+message and the real recipient count first, and only sends when you type SEND.
+There is no undo, which is why it asks twice.
 
 ---
 
@@ -264,6 +270,10 @@ Without it `/api/cron/check` refuses every request, including Vercel's own —
 deliberately, because that endpoint makes outbound requests to arbitrary
 third-party domains and an open version of it is a request amplifier pointed at
 other people's servers. Nothing else breaks; status pages just go stale.
+
+Setting `RESEND_API_KEY` and `EMAIL_FROM` is also what lets you message the
+intent list from the dashboard (item 2). Until they are set, the compose screen
+previews the message and reports plainly that nothing can be sent.
 
 **Resend** — `RESEND_API_KEY` from https://resend.com/api-keys, plus
 `AUTH_FROM_EMAIL` and an `AUTH_SECRET` of at least 16 characters. Only needed

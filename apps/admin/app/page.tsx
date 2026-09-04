@@ -5,6 +5,8 @@ import { Container, Note, Pill } from "@probes/ui";
 import { isAuthenticated } from "../lib/auth.ts";
 import { EVENT_LABELS, loadDashboard } from "../lib/data.ts";
 import { DecisionToggle } from "./decision-toggle.tsx";
+import { Outreach } from "./outreach.tsx";
+import { emailConfigured } from "@probes/email";
 
 export const dynamic = "force-dynamic";
 
@@ -158,6 +160,8 @@ export default async function DashboardPage() {
           People who picked a plan and left an email while payments were off. These are the ones to
           message the day the rail goes live.
         </p>
+        <Outreach emailLive={emailConfigured()} />
+
         {dashboard.recentIntents.length === 0 ? (
           <div className="mt-4">
             <Note>Nothing yet.</Note>
