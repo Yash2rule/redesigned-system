@@ -15,7 +15,7 @@ Before anything else, prove it runs on your machine:
 ```bash
 pnpm install
 pnpm build          # 5 apps, ~60s cold
-pnpm test           # 354 tests, ~3s
+pnpm test           # 371 tests, ~3s
 cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
 ```
 
@@ -250,7 +250,8 @@ Events go to your database regardless; PostHog is a mirror, not the source of
 truth. The admin dashboard reads the database. Add it if you want funnels and
 session replay you did not have to build.
 
-**a. `RESEND_API_KEY` + `EMAIL_FROM`** — needed for change alerts on the
+**a. `RESEND_API_KEY` + `EMAIL_FROM`** — needed for advance-tax reminders on
+the freelancer kit and change alerts and the weekly summary on the
 uptime probe, which are built and tested but send nothing without them. When
 someone enters an alert address and email is not configured, the result page
 tells them plainly that nothing will be sent rather than letting them assume
@@ -258,7 +259,8 @@ they are covered. `EMAIL_FROM` must be on a domain verified with Resend, and
 `APP_BASE_URL` should be set too or the status-page link inside the email is
 relative and useless.
 
-**b. `CRON_SECRET` (uptime probe only)** — needed for scheduled re-checks. Set
+**b. `CRON_SECRET` (uptime probe and freelancer kit)** — needed for scheduled
+re-checks and for the daily advance-tax reminder run. Set
 it and the daily cron in `apps/uptime/vercel.json` starts refreshing every live
 monitor set, which is what makes a status page you sent a client stay current.
 

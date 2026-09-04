@@ -4,5 +4,13 @@
   "buildCommand": "cd ../.. && pnpm turbo run build --filter=@probes/app-freelancer-kit",
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
   "outputDirectory": ".next",
-  "regions": ["bom1"]
+  "regions": [
+    "bom1"
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "0 4 * * *"
+    }
+  ]
 }

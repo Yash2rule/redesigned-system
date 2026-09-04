@@ -401,6 +401,10 @@ function InvoiceForm() {
 
 function AdvanceTaxForm() {
   const tool = useTool<AdvanceTaxResult>("/api/advance-tax", "advance-tax");
+  const [reminderEmail, setReminderEmail] = useState("");
+  const [reminder, setReminder] = useState<{ dueDates: string[]; live: boolean } | null>(null);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+  const [remindBusy, setRemindBusy] = useState(false);
   const [form, setForm] = useState({
     grossReceipts: "",
     expenses: "",
@@ -519,6 +523,83 @@ function AdvanceTaxForm() {
               {tool.result.warnings.map((w) => <li key={w}>• {w}</li>)}
             </ul>
           </ResultSection>
+
+          {tool.result.advanceTaxDue ? (
+            <ResultSection
+              title="Remind me before each due date"
+              description="Missing an instalment costs 1% a month in interest under section 234C. One email per due date, ten days ahead — never a second for the same date."
+            >
+              {reminder ? (
+                <Note>
+                  {reminder.live ? (
+                    <>
+                      Set. You will hear from us ten days before{" "}
+                      {reminder.dueDates.join(", ")} — once each, and nothing else.
+                    </>
+                  ) : (
+                    <>
+                      We saved the reminder for {reminder.dueDates.join(", ")}, but email is not
+                      switched on for this deployment yet, so nothing will be sent. We would rather
+                      tell you that than let you rely on it.
+                    </>
+                  )}
+                </Note>
+              ) : (
+                <div>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <input
+                      type="email"
+                      value={reminderEmail}
+                      onChange={(e) => setReminderEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2.5 text-sm sm:max-w-xs"
+                    />
+                    <button
+                      type="button"
+                      disabled={remindBusy || reminderEmail.length < 5}
+                      onClick={async () => {
+                        setRemindBusy(true);
+                        setReminderError(null);
+                        try {
+                          const response = await fetch("/api/remind", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ ...form, email: reminderEmail }),
+                          });
+                          const payload = (await response.json()) as {
+                            dueDates?: string[];
+                            live?: boolean;
+                            error?: string;
+                          };
+                          if (!response.ok || payload.error || !payload.dueDates) {
+                            setReminderError(payload.error ?? "Could not set the reminder.");
+                            return;
+                          }
+                          setReminder({ dueDates: payload.dueDates, live: payload.live ?? false });
+                        } catch (err) {
+                          setReminderError(`Could not reach the server: ${(err as Error).message}`);
+                        } finally {
+                          setRemindBusy(false);
+                        }
+                      }}
+                      className="rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[var(--accent-ink)] disabled:opacity-50"
+                    >
+                      {remindBusy ? "Setting…" : "Remind me"}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-[12px] text-[var(--muted)]">
+                    We store the email and the schedule computed above, nothing else. The figures
+                    come from what you entered — if your income changes, recompute and set it again.
+                  </p>
+                  {reminderError ? (
+                    <p role="alert" className="mt-3 text-sm text-rose-700">
+                      {reminderError}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </ResultSection>
+          ) : null}
 
           {tool.id ? <Download id={tool.id} label="Download the schedule as PDF" /> : null}
         </div>

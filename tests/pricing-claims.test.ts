@@ -30,8 +30,11 @@ const CONFIGS: ProbeConfig[] = [offerDecoder, ledger, uptime, freelancerKit];
 const NOT_BUILT = [
   // Change alerts ARE built (apps/uptime/lib/notify.ts). Emailed reports,
   // reminders and summaries are not, so those stay flagged.
-  /\bemail(ed)?\b.*\b(report|reminder|summary)\b/i,
-  /\b(report|reminder|summary)\b.*\bemail(ed)?\b/i,
+  // Change alerts, the weekly summary and advance-tax reminders are all built.
+  // What is left unbuilt is a per-client emailed report, so only that shape
+  // stays flagged.
+  /\bemail(ed)?\b.*\bper[- ]client\b/i,
+  /\bper[- ]client\b.*\bemail(ed)?\b/i,
   /\bsaved\b.*\b(client|details|defaults)\b/i,
   /\b(remember|remembers)\b.*\bdefaults?\b/i,
   /\boverride\b.*\bsave\b/i,

@@ -41,9 +41,9 @@ export const config: ProbeConfig = {
         "Your details and your clients' saved, so you type them once",
         "Invoice numbers that increment themselves",
         "Contracts that remember the terms you always use",
+        "An email before every advance-tax due date",
         "Everything as PDF",
       ],
-      planned: ["Advance-tax reminders before each due date"],
     },
     {
       id: "yearly",

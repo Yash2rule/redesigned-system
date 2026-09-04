@@ -32,7 +32,7 @@ each.
 | Plan | Price | What it is |
 | --- | --- | --- |
 | First of each | Free | One invoice, one contract, one tax estimate. PDFs included. |
-| Monthly | ₹299/mo | Unlimited invoices and contracts, your details and clients saved. |
+| Monthly | ₹299/mo | Unlimited invoices and contracts, details saved, tax-date reminders. |
 | Yearly | ₹2,499/yr | Two months free, plus the FY invoice register. |
 
 **Disclaimer**
@@ -73,6 +73,11 @@ r/india_startups.
 > show the four-date schedule regardless, and I've watched people panic in June
 > over a payment they didn't owe, and others assume they had until March when
 > they'd opted out of 44ADA and didn't.
+>
+> It will also email you ten days before each advance-tax due date — once per
+> date, never twice — with the amount and a reminder that 234C charges 1% a
+> month for missing it. That is the point of knowing the 44ADA rule: it is only
+> worth something if you act on it, and nobody remembers 15 March in December.
 >
 > There's also a contract generator: twelve clauses, plain English, covering
 > scope, advance, late fee, revision rounds, who owns the work (tied to payment

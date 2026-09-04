@@ -24,7 +24,7 @@
    visitors per event, with a persisted kill/keep toggle. It ranks on
    result-to-email, and says on the page why: `paid` reads zero everywhere
    until a rail exists, so it cannot rank anything.
-7. **354 tests pass and all five apps build.** Verified in Chromium at 390px and
+7. **371 tests pass and all five apps build.** Verified in Chromium at 390px and
    1280px: zero console errors, no horizontal overflow, forms validate, and
    both document probes produce real results through the actual UI.
 8. **Bugs found by running it rather than by reading it**, all fixed: a missing
