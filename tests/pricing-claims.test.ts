@@ -38,8 +38,6 @@ const NOT_BUILT = [
   /\bsaved\b.*\b(client|details|defaults)\b/i,
   /\b(remember|remembers)\b.*\bdefaults?\b/i,
   /\boverride\b.*\bsave\b/i,
-  /\bregister for your CA\b/i,
-  /\byear-end\b/i,
   /\byour own domain\b/i,
   /\bhourly\b/i,
   /\blogo\b/i,

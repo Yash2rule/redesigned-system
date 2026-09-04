@@ -48,12 +48,22 @@ export type ContractDefaults = {
   ipTransfersOnPayment: string;
 };
 
+export type SavedInvoice = {
+  id: string;
+  number: string;
+  date: string;
+  clientName: string;
+  totalMinor: number;
+};
+
 export type Profile = {
   supplier: SupplierProfile | null;
   clients: SavedClient[];
   contractDefaults: ContractDefaults | null;
   /** Last invoice number issued, so the next one can be suggested. */
   lastInvoiceNumber: string | null;
+  /** Invoices raised from this browser, for the financial-year register. */
+  invoices: SavedInvoice[];
 };
 
 export const EMPTY_PROFILE: Profile = {
@@ -61,9 +71,13 @@ export const EMPTY_PROFILE: Profile = {
   clients: [],
   contractDefaults: null,
   lastInvoiceNumber: null,
+  invoices: [],
 };
 
 export const MAX_CLIENTS = 25;
+
+/** Two years of monthly invoicing, comfortably. */
+export const MAX_INVOICES = 400;
 
 /** A client's identity, for de-duplication: GSTIN if there is one, else name. */
 export function clientKey(client: { name: string; gstin: string }): string {
@@ -84,6 +98,7 @@ export function readProfile(): Profile {
       contractDefaults: profile.contractDefaults ?? null,
       lastInvoiceNumber:
         typeof profile.lastInvoiceNumber === "string" ? profile.lastInvoiceNumber : null,
+      invoices: Array.isArray(profile.invoices) ? profile.invoices.slice(0, MAX_INVOICES) : [],
     };
   } catch {
     // Private mode, disabled storage, or corrupt JSON. Starting fresh is the
@@ -126,6 +141,12 @@ export function saveContractDefaults(defaults: ContractDefaults): void {
 
 export function saveLastInvoiceNumber(invoiceNumber: string): void {
   write({ ...readProfile(), lastInvoiceNumber: invoiceNumber.trim() });
+}
+
+export function saveInvoice(invoice: SavedInvoice): void {
+  const profile = readProfile();
+  const others = profile.invoices.filter((existing) => existing.id !== invoice.id);
+  write({ ...profile, invoices: [invoice, ...others].slice(0, MAX_INVOICES) });
 }
 
 export function forgetEverything(): void {

@@ -12,6 +12,7 @@ import {
   saveClient,
   saveContractDefaults,
   saveLastInvoiceNumber,
+  saveInvoice,
   saveSupplier,
   suggestNextInvoiceNumber,
   type SavedClient,
@@ -63,7 +64,7 @@ export function Desk() {
   );
 }
 
-function useTool<T>(endpoint: string, kind: string) {
+function useTool<T>(endpoint: string, kind: string, onSaved?: (id: string, result: T) => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<T | null>(null);
@@ -86,6 +87,7 @@ function useTool<T>(endpoint: string, kind: string) {
       }
       setResult(payload.result);
       setId(payload.id ?? null);
+      if (payload.id) onSaved?.(payload.id, payload.result);
       trackClient("result_viewed", { kind });
       requestAnimationFrame(() =>
         document.getElementById("out")?.scrollIntoView({ behavior: "smooth", block: "start" }),
@@ -123,10 +125,21 @@ function Errors({ error }: { error: string | null }) {
 // --- invoice ---------------------------------------------------------------
 
 function InvoiceForm() {
-  const tool = useTool<InvoiceResult>("/api/invoice", "invoice");
+  const tool = useTool<InvoiceResult>("/api/invoice", "invoice", (id, result) => {
+    // Remember it so a financial-year register can be assembled later.
+    saveInvoice({
+      id,
+      number: result.input.invoiceNumber,
+      date: result.input.invoiceDate,
+      clientName: result.input.client.name,
+      totalMinor: result.totalMinor,
+    });
+    setInvoiceCount(readProfile().invoices.length);
+  });
   const today = new Date().toISOString().slice(0, 10);
   const [clients, setClients] = useState<SavedClient[]>([]);
   const [remembered, setRemembered] = useState(false);
+  const [invoiceCount, setInvoiceCount] = useState(0);
 
   const [form, setForm] = useState({
     supplierName: "",
@@ -157,6 +170,7 @@ function InvoiceForm() {
     const profile = readProfile();
     setClients(profile.clients);
     setRemembered(profile.supplier !== null);
+    setInvoiceCount(profile.invoices.length);
     const nextNumber = suggestNextInvoiceNumber(profile.lastInvoiceNumber);
     setForm((prev) => ({
       ...prev,
@@ -391,6 +405,14 @@ function InvoiceForm() {
           </ResultSection>
 
           {tool.id ? <Download id={tool.id} label="Download the invoice PDF" /> : null}
+
+          {invoiceCount >= 2 ? (
+            <p className="mt-4 text-sm">
+              <a href="/register" className="font-semibold text-[var(--accent)] underline underline-offset-4">
+                See all {invoiceCount} invoices as a financial-year register
+              </a>
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

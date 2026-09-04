@@ -52,10 +52,10 @@ export const config: ProbeConfig = {
       currency: "INR",
       interval: "year",
       description: "Two months free against the monthly price.",
-      features: ["Everything in Monthly"],
-      planned: [
+      features: [
+        "Everything in Monthly",
         "Financial-year invoice register for your CA",
-        "Year-end receipts summary",
+        "Year-end summary: taxable value, CGST, SGST and IGST charged",
       ],
     },
   ],
@@ -102,6 +102,12 @@ export const config: ProbeConfig = {
       answer:
         "The generated documents are stored so you can download them again. An anonymised copy of the structure is kept to improve the templates — names, addresses, emails, phone numbers, PAN and GSTIN are replaced with meaningless tokens before anything is written down.",
       keywords: ["document", "pdf", "retain", "anonymised", "corpus"],
+    },
+    {
+      question: "Can I get a year's invoices in one file for my CA?",
+      answer:
+        "Yes. Every invoice you raise here is remembered in your browser, and the register page combines them into an Indian financial year with the totals a CA asks for — taxable value and CGST, SGST and IGST separately, by month and by client. It flags a repeated invoice number, because a series has to be consecutive and unique. It is what you invoiced, not what you were paid; those are different numbers.",
+      keywords: ["register", "year", "financial year", "ca", "summary", "gstr", "annual", "filing"],
     },
     {
       question: "Which financial year are the tax rules from?",
