@@ -225,13 +225,16 @@ function buildFindings(http: HttpCheck, tls: TlsCheck | null, domain: DomainChec
 }
 
 export async function runMonitor(rawTarget: string): Promise<MonitorResult> {
-  const { url } = await assertSafeUrl(rawTarget);
+  const { url, addresses } = await assertSafeUrl(rawTarget);
   const hostname = url.hostname;
 
   // All three in parallel: a slow RDAP registry should not delay the HTTP result.
   const [http, tls, domain] = await Promise.all([
     checkHttp(url.toString()),
-    url.protocol === "https:" ? checkTls(hostname) : Promise.resolve(null),
+    // `addresses` are the ones just vetted. Handing them on means the TLS
+    // socket goes to an address we checked rather than re-resolving the name,
+    // which is what a rebinding attack relies on.
+    url.protocol === "https:" ? checkTls(hostname, 443, addresses) : Promise.resolve(null),
     checkDomain(hostname),
   ]);
 

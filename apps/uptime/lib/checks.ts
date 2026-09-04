@@ -1,5 +1,8 @@
+import net from "node:net";
+import http from "node:http";
+import https from "node:https";
 import tls from "node:tls";
-import { assertSafeUrl } from "./safe-url.ts";
+import { assertSafeUrl, pinnedLookup } from "./safe-url.ts";
 
 /**
  * The three checks an agency actually needs, all of which are free to run:
@@ -44,6 +47,37 @@ export type DomainCheck = {
 
 const HTTP_TIMEOUT_MS = 10_000;
 const MAX_REDIRECTS = 5;
+const USER_AGENT = "UptimeProbe/1.0 (+https://github.com)";
+
+/**
+ * Turns a socket error into something a customer can act on.
+ *
+ * Node's messages carry the address it tried ("connect ECONNREFUSED
+ * 203.0.113.4:443"). That address is always one we validated as public, so it
+ * is not a leak — but it is noise to a person reading a status page, and
+ * keeping it out of the response means an error string can never become an
+ * oracle for anything.
+ */
+function describeConnectionError(error: Error): string {
+  if (error.name === "TimeoutError") return error.message;
+  const code = (error as NodeJS.ErrnoException).code;
+  switch (code) {
+    case "ECONNREFUSED":
+      return "Nothing accepted a connection on that port.";
+    case "ENOTFOUND":
+    case "EAI_AGAIN":
+      return "The hostname did not resolve.";
+    case "ECONNRESET":
+      return "The server closed the connection before responding.";
+    case "EHOSTUNREACH":
+    case "ENETUNREACH":
+      return "The host was unreachable.";
+    case "CERT_HAS_EXPIRED":
+      return "The server's TLS certificate has expired.";
+    default:
+      return code ? `The connection failed (${code}).` : error.message;
+  }
+}
 
 /** Response headers worth reporting to an agency's client. */
 const INTERESTING_HEADERS = [
@@ -56,11 +90,73 @@ const INTERESTING_HEADERS = [
   "cache-control",
 ];
 
+type RawResponse = {
+  status: number;
+  headers: Record<string, string | string[] | undefined>;
+};
+
+/**
+ * One HTTP request, sent to an address `assertSafeUrl` already vetted.
+ *
+ * This is node:http rather than fetch for one reason: fetch gives no way to
+ * choose the address it connects to without an undici dispatcher, and this
+ * app has to pin the address to close the DNS-rebinding hole (see
+ * `pinnedLookup`). `http.request` takes a `lookup` directly. Redirects are
+ * followed by hand either way, so nothing is lost — `request` simply does not
+ * follow them at all, where fetch needed `redirect: "manual"`.
+ */
+function requestOnce(url: URL, addresses: string[]): Promise<RawResponse> {
+  return new Promise((resolve, reject) => {
+    const secure = url.protocol === "https:";
+    const client = secure ? https : http;
+    const hostname = url.hostname.replace(/^\[|\]$/g, "");
+    const isIpLiteral = net.isIP(hostname) !== 0;
+
+    const request = client.request(
+      {
+        protocol: url.protocol,
+        hostname,
+        port: url.port || (secure ? 443 : 80),
+        path: `${url.pathname}${url.search}`,
+        method: "GET",
+        headers: { "user-agent": USER_AGENT, host: url.host },
+        lookup: pinnedLookup(addresses),
+        // SNI must not carry an IP address (RFC 6066).
+        ...(secure && !isIpLiteral ? { servername: hostname } : {}),
+        timeout: HTTP_TIMEOUT_MS,
+      },
+      (response) => {
+        // Nothing here reads the body — deliberately, so this can never be
+        // used to read a page back out of somebody else's network. Draining
+        // it frees the socket.
+        response.resume();
+        resolve({ status: response.statusCode ?? 0, headers: response.headers });
+      },
+    );
+
+    request.on("error", (error) => reject(error));
+    request.on("timeout", () => {
+      request.destroy(new TimeoutError());
+    });
+    request.end();
+  });
+}
+
+class TimeoutError extends Error {
+  constructor() {
+    super(`No response within ${HTTP_TIMEOUT_MS / 1000} seconds.`);
+    this.name = "TimeoutError";
+  }
+}
+
 export async function checkHttp(rawUrl: string): Promise<HttpCheck> {
   const redirects: string[] = [];
   let current: string;
+  let addresses: string[];
   try {
-    current = (await assertSafeUrl(rawUrl)).url.toString();
+    const safe = await assertSafeUrl(rawUrl);
+    current = safe.url.toString();
+    addresses = safe.addresses;
   } catch (error) {
     return {
       ok: false,
@@ -79,13 +175,9 @@ export async function checkHttp(rawUrl: string): Promise<HttpCheck> {
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     try {
-      const response = await fetch(current, {
-        redirect: "manual",
-        signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-        headers: { "user-agent": "UptimeProbe/1.0 (+https://github.com)" },
-      });
+      const response = await requestOnce(new URL(current), addresses);
 
-      const location = response.headers.get("location");
+      const location = firstValue(response.headers.location) ?? null;
       if (response.status >= 300 && response.status < 400 && location) {
         if (hop === MAX_REDIRECTS) {
           return {
@@ -103,7 +195,9 @@ export async function checkHttp(rawUrl: string): Promise<HttpCheck> {
         redirects.push(next);
         // Re-check every hop: a public host can redirect to a private one.
         try {
-          current = (await assertSafeUrl(next)).url.toString();
+          const safe = await assertSafeUrl(next);
+          current = safe.url.toString();
+          addresses = safe.addresses;
         } catch (error) {
           return {
             ok: false,
@@ -121,7 +215,7 @@ export async function checkHttp(rawUrl: string): Promise<HttpCheck> {
 
       const headers: Record<string, string> = {};
       for (const name of INTERESTING_HEADERS) {
-        const value = response.headers.get(name);
+        const value = firstValue(response.headers[name]);
         if (value) headers[name] = value.slice(0, 300);
       }
 
@@ -136,9 +230,7 @@ export async function checkHttp(rawUrl: string): Promise<HttpCheck> {
         headers,
       };
     } catch (error) {
-      const message = (error as Error).name === "TimeoutError"
-        ? `No response within ${HTTP_TIMEOUT_MS / 1000} seconds.`
-        : (error as Error).message;
+      const message = describeConnectionError(error as Error);
       return {
         ok: false,
         status: null,
@@ -176,8 +268,19 @@ const firstValue = (value: string | string[] | undefined): string | null => {
 const daysUntil = (iso: string): number =>
   Math.floor((new Date(iso).getTime() - Date.now()) / 86_400_000);
 
-/** Read the certificate straight off a TLS handshake. No API, no cost. */
-export function checkTls(hostname: string, port = 443): Promise<TlsCheck> {
+/**
+ * Read the certificate straight off a TLS handshake. No API, no cost.
+ *
+ * `addresses` are the ones `assertSafeUrl` vetted for this hostname. Passing
+ * them pins the socket to an address we checked, instead of letting Node
+ * resolve the name a second time — see `pinnedLookup`. Callers that have not
+ * resolved the name pass nothing and get ordinary DNS.
+ */
+export function checkTls(
+  hostname: string,
+  port = 443,
+  addresses: string[] = [],
+): Promise<TlsCheck> {
   return new Promise((resolve) => {
     const fail = (message: string) =>
       resolve({
@@ -202,6 +305,7 @@ export function checkTls(hostname: string, port = 443): Promise<TlsCheck> {
       {
         host: hostname,
         port,
+        lookup: pinnedLookup(addresses),
         ...(isIpLiteral ? {} : { servername: hostname }),
         // We want to REPORT on a bad certificate, not refuse to look at one.
         // An expired or mismatched cert is exactly what an agency is paying
@@ -265,7 +369,7 @@ export function checkTls(hostname: string, port = 443): Promise<TlsCheck> {
     socket.on("error", (error) => {
       if (settled) return;
       settled = true;
-      fail(error.message);
+      fail(describeConnectionError(error));
     });
     socket.on("timeout", () => {
       if (settled) return;

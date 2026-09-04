@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { checkHttp, checkTls, parseRdap } from "./checks.ts";
 import type { Severity } from "./monitor.ts";
-import { isPublicAddress } from "./safe-url.ts";
+import { isPublicAddress, pinnedLookup } from "./safe-url.ts";
 import { parseTargets, runMonitor } from "./monitor.ts";
 import { useTempStore } from "../../../tests/helpers.ts";
 import { testCert, type TestCertName } from "../../../tests/certs.ts";
@@ -64,6 +64,10 @@ describe("isPublicAddress — the SSRF guard", () => {
     ["fd00::1", 6],
     ["::ffff:127.0.0.1", 6], // IPv4-mapped loopback
     ["::ffff:169.254.169.254", 6],
+    // The deprecated IPv4-compatible form (RFC 4291 2.5.5.1). glibc renders an
+    // AAAA of ::7f00:1 in exactly this shape, so dns.lookup can hand it back.
+    ["::127.0.0.1", 6],
+    ["::169.254.169.254", 6],
   ] as const;
 
   for (const [address, family] of blocked) {
@@ -153,6 +157,79 @@ describe("checkHttp", () => {
     const result = await checkHttp("https://example.com:8443/");
     expect(result.ok).toBe(false);
     expect(result.error).toContain("ports 80 and 443");
+  });
+});
+
+describe("pinnedLookup — the DNS-rebinding guard", () => {
+  /** Promisified, because Node's lookup contract is a callback. */
+  const resolve = (
+    addresses: string[],
+    hostname: string,
+    options: Record<string, unknown> = {},
+  ): Promise<{ address?: unknown; family?: number }> =>
+    new Promise((done, fail) => {
+      (pinnedLookup(addresses) as unknown as (
+        h: string,
+        o: unknown,
+        cb: (e: Error | null, a?: unknown, f?: number) => void,
+      ) => void)(hostname, options, (error, address, family) => {
+        if (error) fail(error);
+        else done({ address, family });
+      });
+    });
+
+  it("answers with the pinned address, whatever the hostname says", async () => {
+    // This is the whole point. The attacker's nameserver would answer this
+    // second query with 169.254.169.254; we never ask it.
+    const { address, family } = await resolve(["93.184.216.34"], "rebind.attacker.example");
+    expect(address).toBe("93.184.216.34");
+    expect(family).toBe(4);
+  });
+
+  it("answers an all:true query with every pinned address", async () => {
+    const { address } = await resolve(["93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"], "x.example", {
+      all: true,
+    });
+    expect(address).toEqual([
+      { address: "93.184.216.34", family: 4 },
+      { address: "2606:2800:220:1:248:1893:25c8:1946", family: 6 },
+    ]);
+  });
+
+  it("refuses a private address even if one is handed to it", async () => {
+    // Belt and braces: assertSafeUrl already rejects these, but this is the
+    // last thing between a stranger's hostname and a socket.
+    for (const address of ["127.0.0.1", "169.254.169.254", "10.1.2.3", "::1"]) {
+      await expect(resolve([address], "metadata.example")).rejects.toThrow(
+        /No verified public address/,
+      );
+    }
+  });
+
+  it("honours a requested address family", async () => {
+    const both = ["93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"];
+    expect((await resolve(both, "x.example", { family: 6 })).address).toBe(
+      "2606:2800:220:1:248:1893:25c8:1946",
+    );
+    expect((await resolve(both, "x.example", { family: 4 })).address).toBe("93.184.216.34");
+    await expect(resolve(["93.184.216.34"], "x.example", { family: 6 })).rejects.toThrow(
+      /No verified public address/,
+    );
+  });
+
+  it("falls back to real DNS when there is nothing pinned", async () => {
+    // The relaxed test path resolves nothing, so it has nothing to pin to.
+    const { address } = await resolve([], "localhost");
+    expect(["127.0.0.1", "::1"]).toContain(address);
+  });
+
+  it("stops a TLS check reaching a private address that slipped through", async () => {
+    const port = await startHttps("healthy");
+    // Pretend the guard was tricked into vetting a loopback address: the
+    // socket must still refuse to go there.
+    const result = await checkTls("localhost", port, ["127.0.0.1"]);
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("The hostname did not resolve.");
   });
 });
 

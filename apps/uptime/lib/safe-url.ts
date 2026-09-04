@@ -1,4 +1,6 @@
-import { lookup } from "node:dns/promises";
+import { lookup as lookupAsync } from "node:dns/promises";
+import { lookup as lookupCb } from "node:dns";
+import net from "node:net";
 import { UserFacingError } from "@probes/core";
 
 /**
@@ -59,8 +61,11 @@ export function isPublicAddress(address: string, family: number): boolean {
   if (normalised.startsWith("fe80")) return false; // link-local
   if (/^f[cd]/.test(normalised)) return false; // unique local
   if (normalised.startsWith("ff")) return false; // multicast
-  // IPv4-mapped (::ffff:10.0.0.1) must be judged as IPv4.
-  const mapped = normalised.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  // An address carrying an embedded IPv4 address must be judged as IPv4:
+  // ::ffff:10.0.0.1 (IPv4-mapped) and the deprecated ::10.0.0.1
+  // (IPv4-compatible, RFC 4291 2.5.5.1) — glibc will render an AAAA of
+  // ::7f00:1 in exactly that dotted form.
+  const mapped = normalised.match(/^::(?:ffff:)?(\d+\.\d+\.\d+\.\d+)$/);
   if (mapped?.[1]) return isPublicAddress(mapped[1], 4);
   return true;
 }
@@ -111,7 +116,7 @@ export async function assertSafeUrl(raw: string): Promise<SafeUrl> {
 
   let resolved: { address: string; family: number }[];
   try {
-    resolved = await lookup(url.hostname, { all: true });
+    resolved = await lookupAsync(url.hostname, { all: true });
   } catch {
     throw new UserFacingError(
       `We couldn't resolve "${url.hostname}". Check the spelling, or the domain may have expired.`,
@@ -134,4 +139,67 @@ export async function assertSafeUrl(raw: string): Promise<SafeUrl> {
   }
 
   return { url, addresses: resolved.map((r) => r.address) };
+}
+
+/**
+ * Closes the gap between checking an address and connecting to it.
+ *
+ * `assertSafeUrl` resolves a hostname and rejects it if anything it resolves
+ * to is private. But it hands back a URL carrying the *hostname*, and every
+ * client that then uses that URL — fetch, http.request, tls.connect — resolves
+ * it again. Nothing caches DNS between those two resolutions, so an attacker
+ * running their own authoritative nameserver can answer the check with a
+ * public address of theirs and the connection with 169.254.169.254. The guard
+ * passes and the socket still lands inside the network. That is DNS rebinding,
+ * and re-validating each redirect hop does not help, because the swap happens
+ * inside a single hop.
+ *
+ * So: don't resolve twice. Hand Node a `lookup` that ignores the hostname and
+ * returns only the addresses we already validated. The name is still used for
+ * SNI and the Host header, so virtual hosting and certificates keep working —
+ * only the address selection is pinned.
+ *
+ * The addresses are re-checked here as well as in `assertSafeUrl`. That is
+ * deliberate belt-and-braces: this function is the last thing standing between
+ * a stranger's hostname and a real socket.
+ */
+export function pinnedLookup(addresses: string[]): typeof lookupCb {
+  // Empty means the relaxed test path, which never resolved anything to pin
+  // to. Fall through to real DNS; `relaxedFor` has already limited that to
+  // loopback under NODE_ENV=test.
+  if (addresses.length === 0) return lookupCb;
+
+  const entries = addresses
+    .map((address) => ({ address, family: net.isIPv6(address) ? 6 : 4 }))
+    .filter((entry) => isPublicAddress(entry.address, entry.family));
+
+  return ((hostname: string, options: unknown, callback: unknown) => {
+    // Node calls lookup as (hostname, callback) or (hostname, options, callback).
+    const done = (typeof options === "function" ? options : callback) as (
+      error: NodeJS.ErrnoException | null,
+      address?: unknown,
+      family?: number,
+    ) => void;
+    const opts = (typeof options === "function" ? {} : options) as {
+      family?: number | string;
+      all?: boolean;
+    };
+
+    const wanted = Number(opts.family);
+    const matching =
+      wanted === 4 || wanted === 6 ? entries.filter((e) => e.family === wanted) : entries;
+
+    const first = matching[0];
+    if (!first) {
+      const error: NodeJS.ErrnoException = new Error(
+        `No verified public address for ${hostname}.`,
+      );
+      error.code = "ENOTFOUND";
+      done(error);
+      return;
+    }
+
+    if (opts.all) done(null, matching);
+    else done(null, first.address, first.family);
+  }) as typeof lookupCb;
 }
