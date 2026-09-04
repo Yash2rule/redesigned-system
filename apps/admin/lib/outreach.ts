@@ -48,8 +48,21 @@ export async function buildAudience(probe: string): Promise<Audience> {
 
 /** CSV of the intent list, for a spreadsheet or an import into anything else. */
 export function intentsCsv(intents: IntentRow[]): string {
-  const escape = (value: string): string =>
-    /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  // Two separate jobs here, and the second one is the easy one to forget.
+  //
+  // RFC 4180 quoting stops a comma or a newline breaking the row. But a cell
+  // Excel, LibreOffice or Sheets reads as starting with = + - @ (or a tab or a
+  // carriage return) is parsed as a *formula*, and `note` on an intent is free
+  // text posted by an anonymous stranger to a public endpoint — nothing in the
+  // product ever writes it, so every value in that column is hand-crafted by
+  // definition. Left alone, "=HYPERLINK(...)" in a note becomes a live link in
+  // the sheet the operator opens, pointed at every other subscriber's address.
+  // A leading apostrophe is the standard neutraliser: spreadsheets treat the
+  // rest of the cell as text and do not display the quote.
+  const escape = (value: string): string => {
+    const text = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
 
   const header = ["created_at", "probe", "email", "plan", "amount_minor", "currency", "note"];
   const rows = intents.map((intent) =>

