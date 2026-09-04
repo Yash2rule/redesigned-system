@@ -16,7 +16,7 @@ Before anything else, prove it runs on your machine:
 ```bash
 pnpm install
 pnpm build          # 5 apps, ~60s cold
-pnpm test           # 417 tests, ~3s
+pnpm test           # 436 tests, ~3s
 cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
 ```
 
@@ -344,11 +344,11 @@ working (`/api/cron/check`, wired to a daily cron in `apps/uptime/vercel.json`,
 gated on `CRON_SECRET` — see item 7b). The Agency plan describes *hourly*, which
 Vercel Hobby cannot do: it allows one cron per day.
 
-The free path is now written for you: `.github/workflows/scheduled-checks.yml`
-pings the same endpoint hourly on GitHub's schedule, which costs nothing. It
-skips quietly until three repository secrets exist, so it is not sitting there
-red in the meantime. To switch it on, add under Settings → Secrets and
-variables → Actions:
+The mechanism is written for you: `.github/workflows/scheduled-checks.yml`
+pings the same endpoint on GitHub's schedule, which costs nothing. It skips
+quietly until three repository secrets exist, so it is not sitting there red in
+the meantime. To switch it on, add under Settings → Secrets and variables →
+Actions:
 
 | Secret | Value |
 | --- | --- |
@@ -361,10 +361,19 @@ a 200 before trusting the schedule. The endpoints are idempotent and both are
 authenticated by the same bearer token Vercel's own cron sends, so running the
 Vercel daily cron and the GitHub hourly one together is harmless.
 
-Until you have done that and seen it return 200, hourly checks stay in
-`planned` on the pricing page — the mechanism exists, but a mechanism nobody has
-switched on is not a feature, and `tests/pricing-claims.test.ts` will hold you
-to that.
+**It runs daily, not hourly, and that is on purpose.** Every visitor is told a
+free monitor set is re-checked once a day, and hourly is sold as an Agency-plan
+feature the pricing page lists as not built. Running it hourly would have made
+that copy false for everybody, sent twenty-four times the promised traffic to
+domains belonging to other people, and quietly turned "the status page shows the
+last fortnight" into fourteen hours, because `MAX_HISTORY` counts checks rather
+than days.
+
+When you do want hourly, do it in this order: change the first cron to
+`7 * * * *`, raise `MAX_HISTORY` in `apps/uptime/lib/schedule.ts` so a fortnight
+is still a fortnight, and only then move the hourly line out of `planned` in
+`apps/uptime/lib/config.ts`. The claim goes last, after the thing is true —
+`tests/pricing-claims.test.ts` will hold you to that.
 
 **Every paid plan separates what works from what does not, and most of it now
 works.** Of the six unbuilt claims the audit found, all six were built rather

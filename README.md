@@ -21,7 +21,7 @@ Read [`DECISIONS.md`](./DECISIONS.md) for why these four, then
 ```bash
 pnpm install
 pnpm build     # all five apps
-pnpm test      # 417 tests
+pnpm test      # 436 tests
 pnpm dev       # all five in parallel, on ports 3000-3003 and 3010
 ```
 
@@ -71,9 +71,12 @@ on every push and pull request — the same three commands you would run locally
 as three separate steps so a red X names what broke.
 
 `.github/workflows/scheduled-checks.yml` is the free replacement for a paid cron
-tier: it pings `/api/cron/check` hourly and `/api/cron/reminders` daily. It
+tier: it pings `/api/cron/check` and `/api/cron/reminders` once a day each. It
 skips quietly until `CRON_SECRET`, `UPTIME_URL` and `FREELANCER_URL` exist as
 repository secrets, so it is not red on a repo that has not been deployed yet.
+Daily rather than hourly on purpose — the product promises free sets a daily
+re-check, and the schedule has to match the promise. HANDOFF item 11 says what
+to change, and in what order, if you want hourly.
 
 ## Security invariants worth knowing before you change things
 

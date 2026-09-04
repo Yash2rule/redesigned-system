@@ -28,7 +28,7 @@
    visitors per event, with a persisted kill/keep toggle. It ranks on
    result-to-email, and says on the page why: `paid` reads zero everywhere
    until a rail exists, so it cannot rank anything.
-7. **417 tests pass and all five apps build**, on GitHub Actions as well as
+7. **436 tests pass and all five apps build**, on GitHub Actions as well as
    locally — CI runs typecheck, test and build on every push and is green.
    Verified in Chromium at 390px and 1280px: zero console errors, no horizontal
    overflow, forms validate, and both document probes produce real results

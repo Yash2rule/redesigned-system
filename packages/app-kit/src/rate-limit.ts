@@ -74,10 +74,18 @@ export function checkRateLimit(key: string, rule: RateLimitRule): RateLimitResul
  * budget. At the limits set here that is unlikely to bite, and the 429 message
  * invites an email rather than just refusing.
  */
-export function rateLimitKey(request: Request, sessionId: string, scope: string): string {
+export function rateLimitKey(
+  request: Request,
+  sessionId: string | null,
+  scope: string,
+): string {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const ip = forwarded || request.headers.get("x-real-ip");
-  return ip ? `${scope}:ip:${ip}` : `${scope}:session:${sessionId}`;
+  if (ip) return `${scope}:ip:${ip}`;
+  // No forwarded IP and no session: everyone shares one bucket. That is
+  // deliberately the strict direction — routes with no session must not get a
+  // laxer limit than routes with one just because they have less to key on.
+  return `${scope}:session:${sessionId ?? "anonymous"}`;
 }
 
 /** The 429 response, with the headers a well-behaved client expects. */

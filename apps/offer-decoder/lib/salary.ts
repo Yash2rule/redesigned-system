@@ -192,9 +192,20 @@ export function computeSalary(input: SalaryInput): SalaryResult {
 
   const buildOutcome = (tax: india.TaxBreakdown): RegimeOutcome => {
     // Monthly take-home counts only guaranteed monthly cash; the tax on
-    // variable pay is deducted when the variable is paid, not monthly.
+    // variable pay is deducted when the variable is paid, not monthly. So the
+    // year's tax is apportioned by how much of the taxable income is the
+    // guaranteed part.
+    //
+    // Both halves of that fraction must describe the same total. The numerator
+    // includes the employer-PF perquisite, so the denominator has to be
+    // `grossTaxable`, which also includes it — not `taxableBase`, which does
+    // not. With the mismatched pair the ratio went above 1 whenever employer PF
+    // passed ₹7.5 lakh and there was no variable component, so the headline
+    // monthly figure had more than the whole year's tax taken out of it. Wrong
+    // for exactly the senior offers where the number matters most.
+    const fixedShare = fixedCash + employerPfPerquisite;
     const annualTaxOnFixed = Math.round(
-      tax.total * (taxableBase > 0 ? (fixedCash + employerPfPerquisite) / taxableBase : 1),
+      tax.total * (grossTaxable > 0 ? Math.min(1, fixedShare / grossTaxable) : 1),
     );
     const annualInHand = fixedCash - employeePf - professionalTax - annualTaxOnFixed;
     return {

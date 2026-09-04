@@ -3,6 +3,7 @@ import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { EVENT_NAMES, PROBES, isEventName, isProbeId } from "../types.ts";
 import type {
+  ArtifactScope,
   ArtifactRow,
   CorpusRow,
   EventName,
@@ -196,7 +197,7 @@ export class PgStore implements Store {
     };
   }
 
-  async listArtifacts(probe: ProbeId, limit: number): Promise<ArtifactRow[]> {
+  async listArtifacts(probe: ArtifactScope, limit: number): Promise<ArtifactRow[]> {
     await this.ready();
     const rows = await this.db
       .select()

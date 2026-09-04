@@ -38,10 +38,14 @@ export function formRequest(
   return new Request(url, { method: "POST", body: form });
 }
 
-export function jsonRequest(url: string, body: unknown): Request {
+export function jsonRequest(
+  url: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Request {
   return new Request(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
 }

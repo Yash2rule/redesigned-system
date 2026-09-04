@@ -27,6 +27,16 @@ import type { AdvanceTaxResult, Instalment } from "./advance-tax.ts";
 
 export const REMINDER_KIND = "tax-reminder";
 
+/**
+ * Reminders are filed in their own artifact scope rather than alongside
+ * invoices and contracts. `listArtifacts` reads the newest N rows for a scope,
+ * so sharing one with the document artifacts meant that once enough documents
+ * existed the older reminders dropped off the end of the daily scan and were
+ * never sent — a reminder that silently stops arriving being worse than one
+ * never offered.
+ */
+export const REMINDER_SCOPE = "freelancer-kit-reminder";
+
 /** How many days ahead of a due date the reminder goes out. */
 export const REMIND_DAYS_BEFORE = 10;
 
@@ -61,7 +71,7 @@ export async function saveReminder(reminder: TaxReminder): Promise<string> {
   const id = randomUUID();
   await getStore().saveArtifact({
     id,
-    probe: "freelancer-kit",
+    probe: REMINDER_SCOPE,
     sessionId: null,
     payload: reminder as unknown as Json,
     createdAt: reminder.createdAt,
@@ -129,7 +139,7 @@ function isReminder(payload: unknown): payload is TaxReminder {
  */
 export async function runReminders(now: Date = new Date()): Promise<ReminderReport> {
   const store = getStore();
-  const artifacts = await store.listArtifacts("freelancer-kit", 500);
+  const artifacts = await store.listArtifacts(REMINDER_SCOPE, 500);
   const report: ReminderReport = {
     considered: 0,
     due: 0,
@@ -188,7 +198,9 @@ export async function runReminders(now: Date = new Date()): Promise<ReminderRepo
       // Record it immediately, so a crash mid-run cannot double-send.
       await store.saveArtifact({
         id: artifact.id,
-        probe: "freelancer-kit",
+        // Same scope it was read from — writing it back under a different one
+        // would hide it from the next scan and mail the same person forever.
+        probe: REMINDER_SCOPE,
         sessionId: artifact.sessionId,
         payload: {
           ...reminder,

@@ -7,6 +7,23 @@ export function isProbeId(value: unknown): value is ProbeId {
 }
 
 /**
+ * Where an artifact is filed.
+ *
+ * Usually the probe that produced it. The extra scopes exist because
+ * `listArtifacts` reads the newest N rows for a scope, and a scope holding two
+ * unrelated kinds of row silently starves the rarer one: advance-tax reminders
+ * shared "freelancer-kit" with every invoice and contract, so once 500 newer
+ * documents existed the older reminders fell off the end of the scan and were
+ * never sent. A reminder that quietly stops arriving is worse than one that was
+ * never offered.
+ *
+ * These are storage buckets, not probes. `PROBES` still defines what the admin
+ * dashboard reports on, so nothing here shows up as a fifth product.
+ */
+export const ARTIFACT_SCOPES = [...PROBES, "freelancer-kit-reminder"] as const;
+export type ArtifactScope = (typeof ARTIFACT_SCOPES)[number];
+
+/**
  * The seven funnel events, in order. The admin dashboard renders them as
  * columns in exactly this order, so the array is the source of truth for both
  * validation and layout.
@@ -70,7 +87,7 @@ export type CorpusRow = {
 /** A produced result, kept so a visitor can reopen it by URL. */
 export type ArtifactRow = {
   id: string;
-  probe: ProbeId;
+  probe: ArtifactScope;
   sessionId: string | null;
   payload: Json;
   createdAt: string;

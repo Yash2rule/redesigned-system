@@ -6,6 +6,7 @@ import { POST as decode } from "../app/api/decode/route.ts";
 import { GET as report } from "../app/api/report/route.ts";
 import { parseOfferText } from "./parse.ts";
 import { detectRedFlags, detectMissingClauses } from "./redflags.ts";
+import { computeSalary } from "./salary.ts";
 
 const fixture = (name: string) =>
   readFileSync(path.join(process.cwd(), "fixtures", name), "utf8");
@@ -225,5 +226,71 @@ describe("GET /api/report", () => {
   it("404s on an unknown id rather than throwing", async () => {
     const response = await report(new Request("http://localhost/api/report?id=nope"));
     expect(response.status).toBe(404);
+  });
+});
+
+describe("apportioning tax between fixed and variable pay", () => {
+  /**
+   * The monthly headline shows tax on guaranteed cash only, because tax on a
+   * bonus is deducted when the bonus is paid. That apportionment is a fraction,
+   * and both halves must describe the same total — the numerator counted the
+   * employer-PF perquisite while the denominator did not, so the fraction could
+   * exceed 1 and subtract more than the whole year's tax.
+   */
+  const decode = (letter: string) =>
+    computeSalary({
+      parsed: parseOfferText(letter),
+      state: "KA",
+      pfBasis: "full-basic",
+      extraOldRegimeDeductions: 0,
+      downsidePayoutRatio: 1,
+    });
+
+  /** Tax actually deducted from the guaranteed portion, read back out. */
+  const taxOnFixed = (r: ReturnType<typeof computeSalary>, outcome: { annualInHand: number }) =>
+    r.fixedCash - r.employeePf - r.professionalTax - outcome.annualInHand;
+
+  it("never deducts more than the year's tax, even with a large PF perquisite", () => {
+    // Employer PF above ₹7.5 lakh is a taxable perquisite. With no variable
+    // component this was the exact shape that pushed the ratio over 1.
+    const result = decode(`Offer of Employment
+Basic Salary: Rs 75,00,000 per annum
+House Rent Allowance: Rs 37,50,000 per annum
+Special Allowance: Rs 20,00,000 per annum
+Employer PF Contribution: Rs 9,00,000 per annum
+`);
+
+    expect(result.employerPf).toBeGreaterThan(750_000 * 100);
+    for (const outcome of result.regimes) {
+      const deducted = taxOnFixed(result, outcome);
+      expect(deducted).toBeLessThanOrEqual(outcome.tax.total);
+      expect(deducted).toBeGreaterThanOrEqual(0);
+      expect(outcome.monthlyInHand).toBeGreaterThan(0);
+    }
+  });
+
+  it("still holds when there is variable pay", () => {
+    const result = decode(`Offer of Employment
+Basic Salary: Rs 20,00,000 per annum
+House Rent Allowance: Rs 10,00,000 per annum
+Special Allowance: Rs 10,00,000 per annum
+Variable Pay: Rs 8,00,000 per annum
+`);
+    for (const outcome of result.regimes) {
+      const deducted = taxOnFixed(result, outcome);
+      expect(deducted).toBeLessThan(outcome.tax.total);
+      expect(deducted).toBeGreaterThan(0);
+    }
+  });
+
+  it("attributes the whole year's tax to fixed pay when there is nothing else", () => {
+    const result = decode(`Offer of Employment
+Basic Salary: Rs 8,00,000 per annum
+House Rent Allowance: Rs 4,00,000 per annum
+Special Allowance: Rs 4,00,000 per annum
+`);
+    for (const outcome of result.regimes) {
+      expect(taxOnFixed(result, outcome)).toBe(outcome.tax.total);
+    }
   });
 });

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RecordingTransport, setEmailTransport } from "@probes/email";
 import { getStore } from "@probes/core/server";
+import { resetRateLimits } from "@probes/app-kit";
 import { jsonRequest, useTempStore } from "../../../tests/helpers.ts";
 import { POST as remindRoute } from "../app/api/remind/route.ts";
 import { GET as cronRoute } from "../app/api/cron/reminders/route.ts";
@@ -10,6 +11,7 @@ import {
   buildReminder,
   isAuthorisedCron,
   reminderEmail,
+  REMINDER_SCOPE,
   runReminders,
   saveReminder,
 } from "./reminders.ts";
@@ -183,6 +185,9 @@ describe("runReminders", () => {
 });
 
 describe("POST /api/remind", () => {
+  // The limiter is module state shared by every test in this process.
+  beforeEach(() => resetRateLimits());
+
   const payload = {
     grossReceipts: 4000000,
     basis: "actual-books",
@@ -272,5 +277,91 @@ describe("the reminders cron", () => {
     } finally {
       delete process.env.CRON_SECRET;
     }
+  });
+});
+
+describe("reminders are stored where the scan will always find them", () => {
+  it("is filed apart from invoices and contracts", async () => {
+    // They used to share the "freelancer-kit" scope with every document the
+    // probe produces. The daily scan reads the newest 500 rows of a scope, so
+    // once enough invoices existed the older reminders fell off the end and
+    // were never sent — silently, which is the worst way for a reminder to
+    // fail. Separate scopes mean documents can never crowd reminders out.
+    const store = getStore();
+    const id = await saveReminder(buildReminder("asha@example.com", result()));
+
+    await store.saveArtifact({
+      id: "an-invoice",
+      probe: "freelancer-kit",
+      sessionId: null,
+      payload: { kind: "invoice" } as never,
+      createdAt: new Date().toISOString(),
+    });
+
+    const documents = await store.listArtifacts("freelancer-kit", 500);
+    const reminders = await store.listArtifacts(REMINDER_SCOPE, 500);
+
+    expect(documents.map((a) => a.id)).toContain("an-invoice");
+    expect(documents.map((a) => a.id)).not.toContain(id);
+    expect(reminders.map((a) => a.id)).toEqual([id]);
+  });
+
+  it("stays in its own scope after being marked as sent", async () => {
+    // Writing it back under a different scope would hide it from the next
+    // scan, and the same person would be mailed every morning forever.
+    const id = await saveReminder(buildReminder("asha@example.com", result()));
+    await runReminders(new Date());
+    const reminders = await getStore().listArtifacts(REMINDER_SCOPE, 500);
+    expect(reminders.map((a) => a.id)).toEqual([id]);
+  });
+});
+
+describe("POST /api/remind is rate limited", () => {
+  beforeEach(() => resetRateLimits());
+
+  it("stops one address registering reminders without limit", async () => {
+    // The only endpoint where a stranger can make us mail an address of their
+    // choosing, from the domain we had to verify in order to send at all.
+    // Unlimited, it is a spam relay wearing our return address, and the cost
+    // lands on our sending reputation rather than theirs.
+    const send = (n: number) =>
+      remindRoute(
+        jsonRequest(
+          "http://localhost/api/remind",
+          {
+            grossReceipts: 4000000,
+            basis: "actual-books",
+            regime: "new",
+            email: `person${n}@example.com`,
+          },
+          { "x-forwarded-for": "203.0.113.77" },
+        ),
+      );
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 7; i += 1) statuses.push((await send(i)).status);
+
+    // The first few land; the rest are refused.
+    expect(statuses.filter((status) => status === 200).length).toBe(5);
+    expect(statuses.filter((status) => status === 429).length).toBe(2);
+
+    const blocked = await send(99);
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("retry-after")).toBeTruthy();
+  });
+
+  it("keys on the forwarded IP, so dropping a cookie does not reset it", async () => {
+    const post = (ip: string) =>
+      remindRoute(
+        jsonRequest(
+          "http://localhost/api/remind",
+          { grossReceipts: 4000000, basis: "actual-books", regime: "new", email: "a@b.co" },
+          { "x-forwarded-for": ip },
+        ),
+      );
+    for (let i = 0; i < 5; i += 1) await post("198.51.100.9");
+    expect((await post("198.51.100.9")).status).toBe(429);
+    // A different caller is unaffected.
+    expect((await post("198.51.100.10")).status).toBe(200);
   });
 });

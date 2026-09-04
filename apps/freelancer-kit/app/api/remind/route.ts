@@ -1,4 +1,5 @@
 import { emailConfigured } from "@probes/email";
+import { checkRateLimit, rateLimitKey, rateLimitedResponse } from "@probes/app-kit";
 import { computeAdvanceTax } from "../../../lib/advance-tax.ts";
 import { buildReminder, saveReminder } from "../../../lib/reminders.ts";
 import { str, toMinor } from "../../../lib/handlers.ts";
@@ -15,6 +16,22 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
  * amount the engine would produce today.
  */
 export async function POST(request: Request): Promise<Response> {
+  // This endpoint is the one place a stranger can cause us to send mail to an
+  // address of their choosing, from the domain we had to verify to send at all.
+  // Unlimited, that is a spam relay wearing our return address, and the cost of
+  // it lands on the sending reputation rather than on them. Five an hour per IP
+  // is more than anyone setting their own reminders will ever need.
+  const limit = checkRateLimit(rateLimitKey(request, null, "freelancer-remind"), {
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!limit.ok) {
+    return rateLimitedResponse(
+      limit,
+      "That's a lot of reminders in one hour. Try again later — or if you're setting these up for clients, email us.",
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;

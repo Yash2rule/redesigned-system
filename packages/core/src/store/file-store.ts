@@ -3,6 +3,7 @@ import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { EVENT_NAMES, PROBES } from "../types.ts";
 import type {
+  ArtifactScope,
   ArtifactRow,
   CorpusRow,
   EventName,
@@ -276,7 +277,7 @@ export class FileStore implements Store {
     return this.memory.artifacts.get(id) ?? null;
   }
 
-  async listArtifacts(probe: ProbeId, limit: number): Promise<ArtifactRow[]> {
+  async listArtifacts(probe: ArtifactScope, limit: number): Promise<ArtifactRow[]> {
     await this.serial(() => this.load());
     return [...this.memory.artifacts.values()]
       .filter((row) => row.probe === probe)
