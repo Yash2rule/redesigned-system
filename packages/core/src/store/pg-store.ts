@@ -92,7 +92,23 @@ export class PgStore implements Store {
 
   constructor(url: string) {
     // Serverless-friendly pool: Supabase/Neon free tiers cap connections hard.
-    this.sql = postgres(url, { max: 3, idle_timeout: 20, prepare: false });
+    //
+    // The two timeouts are there because of how this failed in production
+    // rather than in theory. A warm instance wedged its connections, and with
+    // no timeout every query on it waited forever: the admin dashboard hung
+    // for the platform's full 300-second function timeout on each request and
+    // only came back when a redeploy replaced the instance. Bounded, the same
+    // failure surfaces in seconds as an error page you can act on. A dashboard
+    // that says it cannot reach the database is worth far more than one that
+    // spins, and nothing here is a query that legitimately takes ten seconds.
+    this.sql = postgres(url, {
+      max: 3,
+      idle_timeout: 20,
+      prepare: false,
+      connect_timeout: 10,
+      // postgres.js accepts this as a per-connection Postgres setting.
+      connection: { statement_timeout: 15_000 },
+    });
     this.db = drizzle(this.sql, { schema: t });
   }
 
