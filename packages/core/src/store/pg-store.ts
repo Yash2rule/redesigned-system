@@ -174,9 +174,30 @@ export class PgStore implements Store {
     }
   }
 
-  /** Idempotent, run-once-per-process DDL. Cheaper than shipping a migrator. */
+  /**
+   * Idempotent, run-once-per-process DDL. Cheaper than shipping a migrator.
+   *
+   * `.simple()` is required, not stylistic: this is several statements in one
+   * string, and postgres.js only sends those over the simple query protocol.
+   * Without it the script goes out on the extended protocol, which a
+   * transaction pooler in front of Postgres handles badly.
+   *
+   * The failure is cached deliberately narrowly. `??=` on its own remembers
+   * the promise whatever happens to it, so one stalled or rejected migration
+   * became permanent for the life of the instance: every later call awaited a
+   * promise that would never settle, and every request failed on its deadline
+   * rather than on anything to do with the query it was making. Clearing the
+   * field on failure means the next request tries again.
+   */
   private ready(): Promise<void> {
-    this.migrated ??= this.sql.unsafe(CREATE_TABLES_SQL).then(() => undefined);
+    this.migrated ??= this.sql
+      .unsafe(CREATE_TABLES_SQL)
+      .simple()
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        this.migrated = null;
+        throw error;
+      });
     return this.migrated;
   }
 
