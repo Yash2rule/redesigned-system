@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "@probes/ui/styles.css";
+
+@source "../../../packages/ui/src";
+@source "../";
+
+:root {
+  --accent: #0f172a;
+  --accent-soft: #f1f5f9;
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@probes/app-ledger",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@probes/analytics": "workspace:*",
+    "@probes/auth": "workspace:*",
+    "@probes/billing": "workspace:*",
+    "@probes/core": "workspace:*",
+    "@probes/ui": "workspace:*",
+    "next": "^16.3.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@probes/app-kit": "workspace:*"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}

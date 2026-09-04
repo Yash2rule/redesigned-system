@@ -1,0 +1,17 @@
+{
+  "name": "@probes/app-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts", "./*": "./src/*" },
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@probes/analytics": "workspace:*",
+    "@probes/billing": "workspace:*",
+    "@probes/core": "workspace:*",
+    "@probes/ui": "workspace:*"
+  },
+  "peerDependencies": { "next": "^16.0.0" }
+}

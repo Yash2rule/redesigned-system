@@ -1,0 +1,41 @@
+{
+  "name": "validation-probes",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run typecheck",
+    "deploy:all": "node scripts/deploy-all.mjs",
+    "seed": "node --experimental-strip-types scripts/seed-demo-data.mts"
+  },
+  "devDependencies": {
+    "@probes/analytics": "workspace:*",
+    "@probes/app-kit": "workspace:*",
+    "@probes/billing": "workspace:*",
+    "@probes/core": "workspace:*",
+    "@probes/email": "workspace:*",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "selfsigned": "^5.5.0",
+    "turbo": "^2.10.12",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild",
+      "@tailwindcss/oxide",
+      "unrs-resolver"
+    ]
+  }
+}

@@ -1,0 +1,82 @@
+name: Scheduled checks
+
+# The free replacement for a paid cron tier.
+#
+# Vercel's Hobby plan allows one cron per day. This pings the same endpoints on
+# a schedule GitHub runs for free — idempotent, and authenticated with the same
+# bearer token Vercel's own cron sends, so running both is harmless.
+#
+# DAILY, deliberately, not hourly. The product tells every visitor that a free
+# monitor set is "re-checked automatically once a day" and sells hourly as an
+# Agency-plan feature that the pricing page still lists as not built. Shipping
+# this on an hourly schedule would have made that copy false for everyone, sent
+# 24x the promised traffic to domains that belong to other people, and turned
+# "the status page shows the last fortnight" into fourteen hours, because
+# MAX_HISTORY counts checks and not days.
+#
+# To switch to hourly: change the first cron to "7 * * * *", raise MAX_HISTORY
+# in apps/uptime/lib/schedule.ts to keep a fortnight of them, and move the
+# hourly line out of `planned` in apps/uptime/lib/config.ts. In that order — the
+# claim goes last, after the thing is true.
+on:
+  schedule:
+    # Re-check monitor sets once a day, at seven past six.
+    - cron: "7 6 * * *"
+    # Invoice reminders once a day too; hourly would nag.
+    - cron: "13 4 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Which endpoint to ping
+        type: choice
+        options: [uptime, reminders, both]
+        default: both
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Re-check monitor sets
+        # The daily monitor schedule, or asked for by hand.
+        if: >-
+          github.event.schedule == '7 6 * * *' ||
+          contains(fromJSON('["uptime","both"]'), inputs.job)
+        env:
+          URL: ${{ secrets.UPTIME_URL }}
+          SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          # Missing secrets is the normal state until the apps are deployed.
+          # Skip quietly rather than failing every hour on a repo that is not
+          # set up yet — a workflow that is always red is a workflow nobody
+          # reads.
+          if [ -z "$URL" ] || [ -z "$SECRET" ]; then
+            echo "::notice::UPTIME_URL or CRON_SECRET not set — skipping."
+            exit 0
+          fi
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            --max-time 300 --retry 2 --retry-delay 10 \
+            -H "Authorization: Bearer $SECRET" \
+            "${URL%/}/api/cron/check")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          # A 401 means the secret is wrong, which is worth a red X.
+          [ "$code" = "200" ]
+
+      - name: Send invoice reminders
+        if: >-
+          github.event.schedule == '13 4 * * *' ||
+          contains(fromJSON('["reminders","both"]'), inputs.job)
+        env:
+          URL: ${{ secrets.FREELANCER_URL }}
+          SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$SECRET" ]; then
+            echo "::notice::FREELANCER_URL or CRON_SECRET not set — skipping."
+            exit 0
+          fi
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            --max-time 300 --retry 2 --retry-delay 10 \
+            -H "Authorization: Bearer $SECRET" \
+            "${URL%/}/api/cron/reminders")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          [ "$code" = "200" ]

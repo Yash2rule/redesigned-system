@@ -1,0 +1,41 @@
+name: CI
+
+# Every push and every pull request. The whole suite runs in well under a
+# minute, so there is nothing to gain from being selective about paths.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  # A newer push to the same branch makes the older run pointless.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Separate steps rather than one `&&` chain: when this goes red, the
+      # failing step name should say what broke without opening the log.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
