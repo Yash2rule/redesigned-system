@@ -1,0 +1,71 @@
+name: Scheduled checks
+
+# The free path to hourly re-checks.
+#
+# Vercel's Hobby plan allows one cron per day, and the uptime probe's Agency
+# plan describes hourly. Rather than requiring a paid plan, this pings the same
+# endpoint on a schedule GitHub runs for free. The endpoints are idempotent and
+# authenticate with the same bearer token Vercel's own cron sends, so running
+# both is harmless — whichever fires first does the work.
+on:
+  schedule:
+    # Hourly, at seven past, to stay off the crowded top of the hour.
+    - cron: "7 * * * *"
+    # Invoice reminders once a day is the right cadence; hourly would nag.
+    - cron: "13 4 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Which endpoint to ping
+        type: choice
+        options: [uptime, reminders, both]
+        default: both
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Re-check monitor sets
+        # Hourly schedule, or asked for by hand.
+        if: >-
+          github.event.schedule == '7 * * * *' ||
+          contains(fromJSON('["uptime","both"]'), inputs.job)
+        env:
+          URL: ${{ secrets.UPTIME_URL }}
+          SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          # Missing secrets is the normal state until the apps are deployed.
+          # Skip quietly rather than failing every hour on a repo that is not
+          # set up yet — a workflow that is always red is a workflow nobody
+          # reads.
+          if [ -z "$URL" ] || [ -z "$SECRET" ]; then
+            echo "::notice::UPTIME_URL or CRON_SECRET not set — skipping."
+            exit 0
+          fi
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            --max-time 300 --retry 2 --retry-delay 10 \
+            -H "Authorization: Bearer $SECRET" \
+            "${URL%/}/api/cron/check")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          # A 401 means the secret is wrong, which is worth a red X.
+          [ "$code" = "200" ]
+
+      - name: Send invoice reminders
+        if: >-
+          github.event.schedule == '13 4 * * *' ||
+          contains(fromJSON('["reminders","both"]'), inputs.job)
+        env:
+          URL: ${{ secrets.FREELANCER_URL }}
+          SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$SECRET" ]; then
+            echo "::notice::FREELANCER_URL or CRON_SECRET not set — skipping."
+            exit 0
+          fi
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            --max-time 300 --retry 2 --retry-delay 10 \
+            -H "Authorization: Bearer $SECRET" \
+            "${URL%/}/api/cron/reminders")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          [ "$code" = "200" ]

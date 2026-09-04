@@ -340,12 +340,31 @@ from which product, which is the entire point of running them in parallel.
 ## 11. Things I did not finish, and exactly where I stopped
 
 **Hourly re-checks for the uptime probe.** Daily re-checks are built and
-working (`/api/cron/check`, wired to a daily cron in
-`apps/uptime/vercel.json`, gated on `CRON_SECRET` — see item 7b). The Agency
-plan promises *hourly*, which Vercel Hobby cannot do: it allows one cron per
-day. Either move that project to Pro, or point an external pinger (a GitHub
-Actions schedule works and is free) at `/api/cron/check` with the same bearer
-token. Until then, do not describe hourly checks as available.
+working (`/api/cron/check`, wired to a daily cron in `apps/uptime/vercel.json`,
+gated on `CRON_SECRET` — see item 7b). The Agency plan describes *hourly*, which
+Vercel Hobby cannot do: it allows one cron per day.
+
+The free path is now written for you: `.github/workflows/scheduled-checks.yml`
+pings the same endpoint hourly on GitHub's schedule, which costs nothing. It
+skips quietly until three repository secrets exist, so it is not sitting there
+red in the meantime. To switch it on, add under Settings → Secrets and
+variables → Actions:
+
+| Secret | Value |
+| --- | --- |
+| `CRON_SECRET` | the same value you set in the Vercel projects |
+| `UPTIME_URL` | the deployed uptime app, e.g. `https://uptime.vercel.app` |
+| `FREELANCER_URL` | the deployed freelancer app |
+
+Then run it once by hand (Actions → Scheduled checks → Run workflow) to confirm
+a 200 before trusting the schedule. The endpoints are idempotent and both are
+authenticated by the same bearer token Vercel's own cron sends, so running the
+Vercel daily cron and the GitHub hourly one together is harmless.
+
+Until you have done that and seen it return 200, hourly checks stay in
+`planned` on the pricing page — the mechanism exists, but a mechanism nobody has
+switched on is not a feature, and `tests/pricing-claims.test.ts` will hold you
+to that.
 
 **Every paid plan separates what works from what does not, and most of it now
 works.** Of the six unbuilt claims the audit found, all six were built rather

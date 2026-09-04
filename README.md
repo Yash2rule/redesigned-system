@@ -64,6 +64,17 @@ that produced it. Clause flags quote the sentence they matched. Tax figures show
 the slabs, the rebate and the surcharge separately, so a CA can check the
 arithmetic in thirty seconds.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs `pnpm typecheck`, `pnpm test` and `pnpm build`
+on every push and pull request — the same three commands you would run locally,
+as three separate steps so a red X names what broke.
+
+`.github/workflows/scheduled-checks.yml` is the free replacement for a paid cron
+tier: it pings `/api/cron/check` hourly and `/api/cron/reminders` daily. It
+skips quietly until `CRON_SECRET`, `UPTIME_URL` and `FREELANCER_URL` exist as
+repository secrets, so it is not red on a repo that has not been deployed yet.
+
 ## Security invariants worth knowing before you change things
 
 Three things here are load-bearing and each has tests that fail loudly if you
