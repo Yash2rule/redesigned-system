@@ -294,3 +294,73 @@ Special Allowance: Rs 4,00,000 per annum
     }
   });
 });
+
+describe("every flag quotes the clause it actually matched", () => {
+  const fixture = (name: string) =>
+    readFileSync(path.join(process.cwd(), "fixtures", name), "utf8");
+
+  /**
+   * The product's central promise is "each one quotes your own letter …
+   * nothing here is invented". The strongest check available without reaching
+   * into the rules: a quote must be enough, on its own, to trigger the same
+   * rule. If it is a window of surrounding text that happens to sit near the
+   * match, it will not be.
+   */
+  for (const name of ["offer-letter-1.txt", "offer-letter-2.txt", "offer-letter-3-ctc-only.txt"]) {
+    it(`holds for ${name}`, () => {
+      const flags = detectRedFlags(fixture(name));
+      expect(flags.length).toBeGreaterThan(0);
+      for (const flag of flags) {
+        const reRun = detectRedFlags(flag.quote).map((f) => f.id);
+        expect(reRun, `"${flag.title}" quoted text that does not contain its own clause`).toContain(
+          flag.id,
+        );
+      }
+    });
+  }
+
+  it("quotes the notice clause for notice, not the salary table", () => {
+    // The exact regression: collapsing newlines before splitting left the
+    // whole document as a handful of enormous sentences, so this flag quoted
+    // the compensation table — which reads precisely like the invention the
+    // quote exists to rule out.
+    const flag = detectRedFlags(fixture("offer-letter-1.txt")).find((f) =>
+      /notice/i.test(f.title),
+    );
+    expect(flag?.quote).toMatch(/notice period/i);
+    expect(flag?.quote).not.toMatch(/Basic Salary/i);
+  });
+
+  it("splits numbered clauses even when the line breaks are lost", () => {
+    // A paste out of a PDF often arrives as one line. "…bought out. 2. The
+    // Joining Bonus…" splits at neither full stop without an explicit rule.
+    const flattened =
+      "1. You will serve a notice period of 90 days. 2. The Joining Bonus is refundable in full if you resign within 12 months of joining. 3. Variable pay is at the sole discretion of the management.";
+    const flags = detectRedFlags(flattened);
+    const clawback = flags.find((f) => /clawback/i.test(f.title));
+    expect(clawback?.quote).toMatch(/Joining Bonus is refundable/i);
+    expect(clawback?.quote).not.toMatch(/sole discretion/i);
+  });
+});
+
+describe("stray text is not read as money", () => {
+  it("ignores a digit that is part of an identifier", () => {
+    // A shell line pasted above a letter turned "offer-letter-1.txt" into a
+    // component worth one rupee. It was disclosed rather than counted, but it
+    // should never have been picked up.
+    const withNoise = `$ cat fixtures/offer-letter-1.txt
+Reference: REQ-7 / Form-16
+Basic Salary 9,60,000
+`;
+    const parsed = parseOfferText(withNoise);
+    expect(parsed.unmatched).toEqual([]);
+    expect(parsed.components.map((c) => c.key)).toContain("basic");
+  });
+
+  it("still reads a small amount when it is marked as money", () => {
+    // The floor applies only to bare numbers: if the writer said ₹ or a unit,
+    // they have told us it is money and we believe them.
+    expect(parseOfferText("Meal allowance ₹900").components).toHaveLength(1);
+    expect(parseOfferText("Sundry 900").components).toHaveLength(0);
+  });
+});

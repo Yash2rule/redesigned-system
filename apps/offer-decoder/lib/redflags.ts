@@ -219,11 +219,29 @@ const RULES: Rule[] = [
   },
 ];
 
-/** Split into sentences without eating decimal points or "Rs." abbreviations. */
+/**
+ * Split into clauses without eating decimal points or "Rs." abbreviations.
+ *
+ * Line breaks are split on FIRST, and horizontal whitespace collapsed only
+ * within a line. An offer letter is a line-structured document and its line
+ * breaks are the most reliable clause boundary in it — collapsing them into
+ * spaces before splitting left the whole numbered TERMS section as one
+ * 2,000-character blob. Every flag then quoted the same opening chunk of it,
+ * and the notice-period flag quoted the salary table, which reads exactly like
+ * the invention the quote exists to rule out.
+ *
+ * Numbered markers get their own boundary because a paste out of a PDF often
+ * arrives with the line breaks already flattened, and "…bought out. 2. The
+ * Joining Bonus…" splits at neither full stop: the first is followed by a
+ * digit rather than a capital, and the second is preceded by one.
+ */
 function sentences(text: string): string[] {
   return text
-    .replace(/\s+/g, " ")
-    .split(/(?<![A-Z][a-z]?)(?<!\d)\.(?=\s+[A-Z(])|(?<=[;:])\s+(?=[A-Z])|\n+/)
+    .replace(/\r\n?/g, "\n")
+    .replace(/[^\S\n]+/g, " ")
+    .split(
+      /\n+|(?=\b\d{1,2}\.\s+[A-Z])|(?<![A-Z][a-z]?)(?<!\d)\.(?=\s+[A-Z(])|(?<=[;:])\s+(?=[A-Z])/,
+    )
     .map((s) => s.trim())
     .filter((s) => s.length > 15);
 }

@@ -95,6 +95,15 @@ function classify(label: string): ComponentKey | null {
   return null;
 }
 
+/**
+ * Smallest bare number we will read as money, in paise (₹1,000).
+ *
+ * Anything below this on a salary line is an index, a clause number or part of
+ * a filename. A figure carrying ₹/Rs/INR or a unit like "lakh" is exempt,
+ * because there the writer has said what it is.
+ */
+const MIN_PLAUSIBLE_AMOUNT = 1_000_00;
+
 /** Pull every number-looking token out of a line, with its position. */
 function numbersIn(line: string): { value: number; index: number; raw: string }[] {
   const out: { value: number; index: number; raw: string }[] = [];
@@ -111,6 +120,13 @@ function numbersIn(line: string): { value: number; index: number; raw: string }[
     const after = line.slice(match.index + match[0].length, match.index + match[0].length + 2);
     if (after.trimStart().startsWith("%")) continue;
     if (!match[2] && /^(19|20)\d{2}$/.test(match[1] ?? "")) continue;
+    // A bare number with no currency mark and no unit has to be a plausible
+    // annual figure before we treat it as one. Without this, the digit inside
+    // any identifier that happens to sit on a line — "offer-letter-1.txt",
+    // "Form-16", a reference number — became a component worth one rupee.
+    // Nothing in a CTC is denominated in single rupees.
+    const marked = /^\s*(?:₹|rs\.?|inr)/i.test(match[0]);
+    if (!marked && !match[2] && value < MIN_PLAUSIBLE_AMOUNT) continue;
     out.push({ value, index: match.index, raw });
   }
   return out;
