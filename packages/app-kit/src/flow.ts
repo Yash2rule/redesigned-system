@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { getStore, ingestFile, ingestText, isUserFacingError, recordCorpus } from "@probes/core/server";
+import {
+  RETIRED_MESSAGE,
+  getStore,
+  ingestFile,
+  ingestText,
+  isRetired,
+  isUserFacingError,
+  recordCorpus,
+} from "@probes/core/server";
 import type { Json, IngestResult, ProbeId, TextMode } from "@probes/core/server";
 import { ensureSession, track } from "@probes/analytics";
 import { readSessionId, withSessionCookie } from "./session.ts";
@@ -44,6 +52,13 @@ export async function runProbeFlow<T>(
       sessionId,
       minted,
     );
+
+  // A retired probe stops working before it stops being visited. Gating here
+  // covers every document probe at once, and 410 rather than 404 says the
+  // difference that matters: this existed, and it is finished.
+  if (await isRetired(options.probe)) {
+    return json({ error: RETIRED_MESSAGE, retired: true }, 410);
+  }
 
   const limit = checkRateLimit(rateLimitKey(request, sessionId, options.probe), {
     limit: options.rateLimitPerHour ?? 30,

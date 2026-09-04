@@ -1,3 +1,4 @@
+import { RETIRED_MESSAGE, isRetired } from "@probes/core/server";
 import { paymentsLive } from "@probes/billing";
 import {
   BenefitList,
@@ -5,6 +6,7 @@ import {
   FaqSection,
   Hero,
   PageView,
+  RetiredPage,
   PricingBlock,
   SectionHeading,
   SiteFooter,
@@ -15,7 +17,14 @@ import { Checker } from "./checker.tsx";
 
 export const dynamic = "force-dynamic";
 
-export default function Page() {
+export default async function Page() {
+  // A retired probe shows why it ended instead of a shopfront that no
+  // longer works. Fails open: if this cannot be determined, the real page
+  // is served.
+  if (await isRetired("uptime")) {
+    return <RetiredPage name={config.name} message={RETIRED_MESSAGE} />;
+  }
+
   const live = paymentsLive("USD");
 
   return (

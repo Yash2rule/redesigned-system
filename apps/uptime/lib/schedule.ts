@@ -1,4 +1,4 @@
-import { getStore } from "@probes/core/server";
+import { getStore, isRetired } from "@probes/core/server";
 import type { Json } from "@probes/core";
 import { runChecks } from "./monitor.ts";
 import type { CheckRunResult, Severity } from "./monitor.ts";
@@ -97,6 +97,24 @@ export async function runScheduledChecks(
   baseUrl = process.env.APP_BASE_URL?.trim() || "",
 ): Promise<ScheduleReport> {
   const startedAt = now.toISOString();
+
+  // A retired probe stops making requests to other people's servers. The
+  // scheduler is the one part that keeps working long after anyone stops
+  // visiting, so it is the part most likely to outlive the decision.
+  if (await isRetired("uptime")) {
+    return {
+      considered: 0,
+      refreshed: 0,
+      skippedStale: 0,
+      alertsSent: 0,
+      alertsSkipped: ["this probe has been retired — no checks were run"],
+      weeklyReportsSent: 0,
+      failed: [],
+      startedAt,
+      finishedAt: new Date().toISOString(),
+    };
+  }
+
   const store = getStore();
   const artifacts = await store.listArtifacts("uptime", 200);
 

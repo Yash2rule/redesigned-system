@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { getStore, isUserFacingError, recordCorpus } from "@probes/core/server";
+import { RETIRED_MESSAGE, getStore, isRetired, isUserFacingError, recordCorpus } from "@probes/core/server";
 import type { Json } from "@probes/core";
 import { ensureSession, track } from "@probes/analytics";
 import { emailConfigured } from "@probes/email";
@@ -37,6 +37,13 @@ export async function POST(request: Request): Promise<Response> {
       sessionId,
       minted,
     );
+
+  // This probe does not go through runProbeFlow, so it carries its own
+  // retirement gate. Doubly worth having here: a retired uptime probe that
+  // kept running would go on making requests to other people's servers.
+  if (await isRetired("uptime")) {
+    return json({ error: RETIRED_MESSAGE, retired: true }, 410);
+  }
 
   // Stricter than the document probes: every run here makes outbound requests
   // to servers that belong to someone else. Ten runs an hour is generous for

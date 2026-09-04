@@ -341,6 +341,65 @@ than leaving it.
 
 ---
 
+## 3b. The automated decision layer
+
+Validation now runs itself. Nightly, on the GitHub schedule that already
+exists, so it costs nothing: read the funnel, apply explicit rules, record a
+verdict with its reasoning, and retire a probe that has been answered.
+
+**Where it is.** The rules are one pure function in
+`packages/core/src/decide` — every path through them tested without a database
+or a deployment. The endpoint that applies them is
+`apps/admin/app/api/cron/decide`, gated on `CRON_SECRET` like the other
+scheduled endpoints and for a stronger reason: this one can switch a product
+off.
+
+**What it ranks on.** Result-to-email against a named price, the strongest
+honest signal while every buy button only records intent. It switches itself
+to payment rate once a rail has taken at least five sales — one sale is not a
+rate, and nobody remembers to change a comparator by hand.
+
+**What it refuses to do**, which is most of the design:
+
+| Guard | Why |
+| --- | --- |
+| No verdict below 100 landers and 20 results | A rule applied to thirty visitors is a coin toss with a percentage sign on it. Retiring is close to one-way — a dead probe collects nothing, so it cannot climb back — which is what makes this the most important number in the file. |
+| Below 10% activation, the verdict is "the funnel is broken" | What the survivors of a bad landing page did says nothing about whether anyone wants the thing. |
+| `watch` and `insufficient-data` never touch the switch | They mean "I do not know". Writing that would discard whatever is there in favour of nothing. |
+| A human's decision is never overwritten | The automation recognises its own verdicts by an `[auto]` marker in the note and revises those freely. Anything else belongs to the person who set it, and silently reverting an override overnight would make the dashboard untrustworthy. |
+
+**What "acting" means.** A retired probe stops being a shopfront that no
+longer works: the landing page says what happened and asks for nothing — no
+email field, no prices, no waiting list. The shared probe flow returns 410,
+covering three probes at once; uptime carries its own gate because it does not
+use that flow, and its scheduler carries a third, since a retired uptime probe
+that kept its daily run would go on making requests to other people's servers
+long after anyone stopped visiting.
+
+**The retirement check fails open, deliberately.** Every unknown answers "not
+retired" — a blip, a timeout, a cold start that cannot reach the pooler. The
+two ways to be wrong are not symmetrical: serving a killed probe for one more
+minute loses rows nobody reads, while showing "this experiment has ended"
+across four working products because a query failed is a self-inflicted outage
+that also lies to everyone who sees it.
+
+**To turn it on you need one more repository secret:** `ADMIN_URL` =
+`https://redesigned-system-admin.vercel.app`. Until it exists the step skips
+quietly like the others. Set the repository *variable* `DECIDE_DRY_RUN` to `1`
+and it reports what it would do without doing it — worth leaving on for the
+first few runs once traffic starts arriving. Every run writes the verdicts and
+the reasoning into the Actions run summary, so the decision is readable without
+opening the dashboard.
+
+**What it will not do: post anything.** Reddit and Hacker News both prohibit
+automated submissions, HN bans domains for it and the ban outlasts the probe
+that earned it, and it is your name on the post. It is also the wrong thing to
+automate on its own terms — item 10 says post when you can sit with the thread,
+because the replies are the signal, and a bot collects the post and misses the
+thing you wanted.
+
+---
+
 ## 4. Payment keys
 
 **Why:** Until these exist, every buy button records purchase intent and tells
@@ -479,6 +538,26 @@ but tested is not the same as reviewed, and this is the one probe where being
 wrong costs a user real money and real credibility with their client's accounts
 team.
 
+**You are not blocked on this, and it is worth being clear about why.** The
+app never claims compliance: its disclaimer says invoices are generated
+against the particulars the CGST Rules require and tells people to have a
+chartered accountant check anything they intend to file. That is honest
+without a review. What the review buys is a stronger claim, not permission to
+ship — and `LAUNCH.md` already forbids the words "GST-compliant" in the post
+until it happens.
+
+**If you have no CA and no contacts,** you do not need an introduction: ICAI
+publishes a member and firm directory searchable by city, and ClearTax,
+Quicko, TaxBuddy, IndiaFilings and Vakilsearch all sell one-off consultations
+for roughly ₹500–3,000. Whoever filed your last return is cheaper still. This
+is an hour of routine work for any practising CA, not a favour.
+
+**The four invoices are already generated** — one of each shape, from the
+deployed app, arithmetic checked: ₹1,50,000 base, ₹27,000 tax in both taxable
+cases, split correctly each way, no tax and no "Tax Invoice" heading on the
+unregistered one. Regenerate them any time from the invoice tool, or ask for
+the four payloads.
+
 Have a CA check one invoice of each of these four shapes before you describe it
 publicly as GST-compliant:
 
@@ -564,6 +643,11 @@ Each probe has a `LAUNCH.md` with three ready-to-post pieces and a
 
 1. **freelancer-kit** — but only after item 8. Sharpest hook (the 44ADA
    single-instalment rule), most defensible claim, clearest audience.
+
+   **If item 8 has not happened, this is not first — offer-decoder is.** The
+   only thing putting freelancer-kit at the top is a review that makes its
+   claim the most defensible of the four. Waiting on someone else's hour to
+   launch anything at all is the wrong trade: the probe below needs nobody.
 2. **offer-decoder** — biggest audience, easiest to explain in five seconds.
    Post to r/developersIndia when you can sit with the thread for two hours.
 3. **ledger** — the Show HN is the strongest piece of writing of the eight,
