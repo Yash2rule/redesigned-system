@@ -7,9 +7,9 @@ committed.
 **Push status: pushed.** The branch is on GitHub — item 0 has the link. No
 pull request has been opened; that is your call.
 
-**Deployment status: not deployed.** No Vercel, Supabase or Neon credentials
-existed in the build environment, so there are no preview URLs to record. The
-repo is deploy-ready and item 3 below is a 15-minute job.
+**Deployment status: one of five.** offer-decoder is live on Supabase and
+verified; the other four are blocked on a Vercel token that can create
+projects, which is the first thing item 3 explains.
 
 Before anything else, prove it runs on your machine:
 
@@ -121,19 +121,19 @@ There is no undo, which is why it asks twice.
 
 ## 3. Vercel projects
 
-**Why:** Nothing is deployed. Five projects, one per app, each independently
-deployable from this monorepo.
+**Why:** Five projects, one per app, each independently deployable from this
+monorepo. One of them is live; four are not.
 
-There are two ways in. **Prefer the Git integration** — it needs no token on
-any machine but yours, and it redeploys on every push afterwards.
+There are three ways in. **Prefer the Git integration** — it needs no token on
+any machine but yours, and it redeploys on every push afterwards. Route **c**
+is the unattended one, and is where the two credential traps are written down.
 
 ### a. Git integration (recommended)
 
-**Merge the pull request first.** Vercel builds the *production branch*, which
-is `main`, and `main` currently has almost nothing on it. Connecting Vercel
-before merging gets you five deployments of an empty repository.
+`main` now carries all five apps, so there is nothing to merge first — Vercel
+builds the production branch and the production branch is complete.
 
-Then, in the Vercel dashboard, five times — once per app:
+In the Vercel dashboard, four times — once per app still missing:
 
 ```
 Add New → Project → import Yash2rule/redesigned-system
@@ -160,6 +160,45 @@ pnpm deploy:all -- --prod
 
 The script prompts once per app to link a project — give each a distinct name.
 
+### c. API, unattended — `pnpm provision`
+
+`scripts/vercel-provision.mjs` does the whole of this item from the REST API
+with a token and no prompts: creates each project, sets the root directory and
+the outside-files flag, writes `DATABASE_URL` (and `ADMIN_PASSWORD` on admin),
+triggers a production deploy from `main`, waits for the build, then checks
+`/api/health` actually answers *as the right probe* — a project pointed at the
+wrong root directory builds and serves perfectly happily, it just serves
+somebody else's app.
+
+```bash
+export VERCEL_TOKEN=...            # see the warning below
+export VERCEL_TEAM_ID=team_QII22sqhA7Awl93TStAbTxjd
+export DATABASE_URL=...            # the same Supabase string all five share
+export ADMIN_PASSWORD=...          # item 2
+pnpm provision                     # or: --dry-run, --verify-only, --apps=ledger,admin
+```
+
+It is idempotent — re-running it against a project that already exists updates
+settings and env and redeploys, so it is also the tool for "change the database
+string on all five".
+
+**The token has to be an account or team token.** The one in the build
+environment starts with `vcp_`, which is a *project-scoped* token: it can read
+and deploy the single project it was minted for, and project creation comes
+back `403 You don't have permission to create the project`. That is why the
+four projects below are still empty. Mint one at
+https://vercel.com/account/settings/tokens with its scope set to the owning
+team, or create the five projects by hand through the dashboard (route **a**)
+and then run `pnpm provision --verify-only`.
+
+**`DATABASE_URL` cannot be copied off the offer-decoder project.** It was
+written there as a `sensitive` variable, and Vercel never returns the value of
+one of those — not to the dashboard, not to `vercel env pull`, not to the API,
+which answers `"decrypted": false` and an empty string. Paste it again from the
+Supabase connection-string page. `pnpm provision` writes it as `encrypted`
+instead, which is Vercel's default and still encrypted at rest, so the next
+person can read it back rather than hitting this same wall.
+
 ### Two things that may bite on the Hobby plan
 
 **Region.** Each `vercel.json` pins a region — Mumbai (`bom1`) for the three
@@ -179,6 +218,17 @@ After deploying, set `DATABASE_URL` (item 1) on every project and
 decoded end to end, six tables created on first request. `/api/health` reports
 `"database": true`, but note that only means `DATABASE_URL` is set and non-empty;
 it never opens a connection. Doing one real decode is what proves the string.
+
+It was redeployed from `main` through `pnpm provision` to prove that path
+works: build READY, `/api/health` still `"database": true`, homepage 200. Worth
+knowing from that run — the `bom1` region in `vercel.json` was accepted, so the
+Hobby-plan region warning above did not bite.
+
+**The other four are not created yet, and it is a permissions wall, not a
+to-do.** Both halves of it are described under route **c**: the token in the
+environment cannot create projects, and the database string cannot be read back
+off the project that has it. Give `pnpm provision` a team-scoped token and the
+Supabase string and it finishes this item in one command.
 
 **Record the URLs here when you have them:**
 
