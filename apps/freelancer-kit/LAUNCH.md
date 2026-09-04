@@ -32,7 +32,7 @@ each.
 | Plan | Price | What it is |
 | --- | --- | --- |
 | First of each | Free | One invoice, one contract, one tax estimate. PDFs included. |
-| Monthly | ₹299/mo | Unlimited, saved client details, tax reminders. |
+| Monthly | ₹299/mo | Unlimited invoices and contracts, your details and clients saved. |
 | Yearly | ₹2,499/yr | Two months free, plus the FY invoice register. |
 
 **Disclaimer**
@@ -79,6 +79,12 @@ r/india_startups.
 > in full), confidentiality and termination. It deliberately cites no sections
 > or acts anywhere — a fabricated citation in a contract is worse than none,
 > and there's a test that fails the build if one appears.
+>
+> Your own details, your clients and your usual contract terms are remembered
+> so the second invoice takes about ten seconds — and they are kept in your
+> browser, not on my server. I never receive your GSTIN, your PAN or your
+> client list. The trade-off is that they do not follow you to another device,
+> which the page says plainly.
 >
 > It is not advice. It does not file anything. It shows every assumption and
 > rule it used so a CA can check it in thirty seconds.

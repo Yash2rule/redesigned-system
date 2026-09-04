@@ -6,7 +6,7 @@ export const config: ProbeConfig = {
   tagline: "Invoices, contracts and advance-tax dates for Indian freelancers.",
   headline: "The paperwork side of freelancing, done in three minutes instead of three evenings.",
   subheadline:
-    "A GST invoice that splits CGST and SGST correctly, a services agreement written in plain words, and an advance-tax schedule that knows section 44ADA has one due date rather than four. No account needed to produce the first of each.",
+    "A GST invoice that splits CGST and SGST correctly, a services agreement written in plain words, and an advance-tax schedule that knows section 44ADA has one due date rather than four. Your details are remembered so the second invoice takes seconds. No account needed.",
   ctaLabel: "Make an invoice",
   accent: "#b45309",
   accentSoft: "#fffbeb",
@@ -14,12 +14,12 @@ export const config: ProbeConfig = {
 
   benefits: [
     {
-      title: "GST that splits the right way",
-      body: "Same state as your client means CGST plus SGST at half the rate each. Different state means IGST at the full rate. We decide it from the GSTINs, not from a dropdown you might get wrong — and if you have no GSTIN, we refuse to add tax at all.",
+      title: "Type your details once",
+      body: "Your name, GSTIN, PAN and address are remembered, your clients build up into a list you pick from, and the invoice number increments itself. All of it stays in your browser — none of it is sent to us.",
     },
     {
-      title: "A contract you can actually read",
-      body: "Twelve clauses in plain English covering scope, money, revisions, who owns the work, and how either side gets out. No citations, because a made-up section number is worse than none.",
+      title: "GST that splits the right way",
+      body: "Same state as your client means CGST plus SGST at half the rate each. Different state means IGST at the full rate. We decide it from the GSTINs, not from a dropdown you might get wrong — and if you have no GSTIN, we refuse to add tax at all.",
     },
     {
       title: "The 44ADA date almost nobody gets right",
@@ -36,12 +36,14 @@ export const config: ProbeConfig = {
       interval: "month",
       description: "Unlimited invoices, contracts and tax estimates.",
       highlight: true,
-      features: ["Unlimited GST invoices", "Unlimited contracts", "Everything as PDF"],
-      planned: [
-        "Saved client details, so you type them once",
-        "Contract templates that remember your defaults",
-        "Advance-tax reminders before each due date",
+      features: [
+        "Unlimited GST invoices and contracts",
+        "Your details and your clients' saved, so you type them once",
+        "Invoice numbers that increment themselves",
+        "Contracts that remember the terms you always use",
+        "Everything as PDF",
       ],
+      planned: ["Advance-tax reminders before each due date"],
     },
     {
       id: "yearly",
@@ -90,10 +92,16 @@ export const config: ProbeConfig = {
       keywords: ["contract", "enforceable", "legal", "template", "lawyer", "valid"],
     },
     {
-      question: "Do you store my client's details?",
+      question: "Where are my details and my clients stored?",
       answer:
-        "The documents you generate are stored so you can download them again. An anonymised copy of the structure is kept to improve the templates — names, addresses, emails, phone numbers, PAN and GSTIN are replaced with meaningless tokens before anything is written down.",
-      keywords: ["privacy", "store", "data", "client", "delete", "secure"],
+        "In your browser, not on our servers. Your name, GSTIN, PAN, address, your saved clients and your usual contract terms are held in local storage on the device you are using, so we never receive them. The trade-off is that they do not follow you to another browser or device, and clearing site data loses them. There is a 'forget everything now' link under the invoice form.",
+      keywords: ["privacy", "store", "data", "client", "delete", "secure", "saved", "remember", "localstorage"],
+    },
+    {
+      question: "What about the documents themselves?",
+      answer:
+        "The generated documents are stored so you can download them again. An anonymised copy of the structure is kept to improve the templates — names, addresses, emails, phone numbers, PAN and GSTIN are replaced with meaningless tokens before anything is written down.",
+      keywords: ["document", "pdf", "retain", "anonymised", "corpus"],
     },
     {
       question: "Which financial year are the tax rules from?",

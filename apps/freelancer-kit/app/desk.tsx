@@ -1,11 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatInr } from "@probes/core/money.ts";
 import { DataTable, Note, Pill, ResultSection, StatGrid, trackClient } from "@probes/ui";
 import type { InvoiceResult } from "../lib/invoice.ts";
 import type { AdvanceTaxResult } from "../lib/advance-tax.ts";
 import type { ContractResult } from "../lib/contract.ts";
+import {
+  forgetEverything,
+  readProfile,
+  saveClient,
+  saveContractDefaults,
+  saveLastInvoiceNumber,
+  saveSupplier,
+  suggestNextInvoiceNumber,
+  type SavedClient,
+} from "../lib/profile.ts";
 
 type Tab = "invoice" | "advance-tax" | "contract";
 
@@ -115,6 +125,8 @@ function Errors({ error }: { error: string | null }) {
 function InvoiceForm() {
   const tool = useTool<InvoiceResult>("/api/invoice", "invoice");
   const today = new Date().toISOString().slice(0, 10);
+  const [clients, setClients] = useState<SavedClient[]>([]);
+  const [remembered, setRemembered] = useState(false);
 
   const [form, setForm] = useState({
     supplierName: "",
@@ -140,11 +152,63 @@ function InvoiceForm() {
   const set = (key: keyof typeof form) => (event: { target: { value: string } }) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
 
+  // localStorage is only readable after mount.
+  useEffect(() => {
+    const profile = readProfile();
+    setClients(profile.clients);
+    setRemembered(profile.supplier !== null);
+    const nextNumber = suggestNextInvoiceNumber(profile.lastInvoiceNumber);
+    setForm((prev) => ({
+      ...prev,
+      ...(profile.supplier
+        ? {
+            supplierName: profile.supplier.name,
+            supplierAddress: profile.supplier.address,
+            supplierGstin: profile.supplier.gstin,
+            supplierEmail: profile.supplier.email,
+            supplierPan: profile.supplier.pan,
+          }
+        : {}),
+      ...(nextNumber ? { invoiceNumber: nextNumber } : {}),
+    }));
+  }, []);
+
+  function applyClient(id: string) {
+    const client = clients.find((entry) => entry.id === id);
+    if (!client) return;
+    setForm((prev) => ({
+      ...prev,
+      clientName: client.name,
+      clientAddress: client.address,
+      clientGstin: client.gstin,
+      clientCountry: client.country || "India",
+    }));
+  }
+
   return (
     <div>
       <form
         onSubmit={(event) => {
           event.preventDefault();
+          // Remember the details worth not retyping. Stays in this browser.
+          saveSupplier({
+            name: form.supplierName,
+            address: form.supplierAddress,
+            gstin: form.supplierGstin,
+            email: form.supplierEmail,
+            phone: "",
+            pan: form.supplierPan,
+          });
+          saveClient({
+            name: form.clientName,
+            address: form.clientAddress,
+            gstin: form.clientGstin,
+            country: form.clientCountry,
+          });
+          saveLastInvoiceNumber(form.invoiceNumber);
+          setClients(readProfile().clients);
+          setRemembered(true);
+
           void tool.run({
             supplier: {
               name: form.supplierName,
@@ -177,6 +241,28 @@ function InvoiceForm() {
         }}
         className="space-y-6 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-6"
       >
+        {clients.length > 0 ? (
+          <label className="block text-sm">
+            <span className={labelText}>Bill a client you have invoiced before</span>
+            <select
+              defaultValue=""
+              onChange={(event) => {
+                applyClient(event.target.value);
+                event.target.value = "";
+              }}
+              className={field}
+            >
+              <option value="">Choose a saved client…</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                  {client.gstin ? ` — ${client.gstin}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         <fieldset>
           <legend className="mb-3 text-sm font-semibold">You</legend>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -242,6 +328,27 @@ function InvoiceForm() {
           className="rounded-lg bg-[var(--accent)] px-5 py-3 text-[15px] font-semibold text-[var(--accent-ink)] disabled:opacity-50">
           {tool.busy ? "Building…" : "Make the invoice"}
         </button>
+
+        <p className="text-[12px] leading-relaxed text-[var(--muted)]">
+          {remembered
+            ? "Your details and this client are remembered for next time, and the invoice number increments on its own."
+            : "Your details and the client's will be remembered for next time."}{" "}
+          All of it stays in this browser — your GSTIN, PAN and your clients&apos; details are
+          never sent to us. Clearing site data, or opening this on another device, means typing
+          them again.{" "}
+          <button
+            type="button"
+            onClick={() => {
+              forgetEverything();
+              setClients([]);
+              setRemembered(false);
+            }}
+            className="underline underline-offset-2"
+          >
+            Forget everything now
+          </button>
+          .
+        </p>
       </form>
 
       {tool.result ? (
@@ -424,6 +531,7 @@ function AdvanceTaxForm() {
 
 function ContractForm() {
   const tool = useTool<ContractResult>("/api/contract", "contract");
+  const [rememberedDefaults, setRememberedDefaults] = useState(false);
   const [form, setForm] = useState({
     freelancerName: "",
     freelancerAddress: "",
@@ -448,11 +556,35 @@ function ContractForm() {
   const set = (key: keyof typeof form) => (event: { target: { value: string } }) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
 
+  // Terms are the part nobody wants to re-decide; names change every time.
+  useEffect(() => {
+    const profile = readProfile();
+    const savedName = profile.supplier?.name;
+    if (savedName) setForm((prev) => ({ ...prev, freelancerName: savedName }));
+    const defaults = profile.contractDefaults;
+    if (defaults) {
+      setRememberedDefaults(true);
+      setForm((prev) => ({ ...prev, ...defaults }));
+    }
+  }, []);
+
   return (
     <div>
       <form
         onSubmit={(event) => {
           event.preventDefault();
+          saveContractDefaults({
+            paymentTermsDays: form.paymentTermsDays,
+            advancePct: form.advancePct,
+            lateFeePctPerMonth: form.lateFeePctPerMonth,
+            noticeDays: form.noticeDays,
+            revisionRounds: form.revisionRounds,
+            confidentialityMonths: form.confidentialityMonths,
+            jurisdictionCity: form.jurisdictionCity,
+            ipTransfersOnPayment: form.ipTransfersOnPayment,
+          });
+          setRememberedDefaults(true);
+
           void tool.run({ ...form, ipTransfersOnPayment: form.ipTransfersOnPayment === "yes" });
         }}
         className="grid gap-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 sm:grid-cols-2 sm:p-6"
@@ -513,6 +645,12 @@ function ContractForm() {
             className="mt-2 rounded-lg bg-[var(--accent)] px-5 py-3 text-[15px] font-semibold text-[var(--accent-ink)] disabled:opacity-50">
             {tool.busy ? "Drafting…" : "Draft the contract"}
           </button>
+          <p className="mt-3 text-[12px] leading-relaxed text-[var(--muted)]">
+            {rememberedDefaults
+              ? "Your usual terms — advance, payment days, late fee, notice, jurisdiction — were filled in from last time."
+              : "Your terms will be remembered for next time, so only the names and the scope change."}{" "}
+            Stored in this browser only.
+          </p>
         </div>
       </form>
 
