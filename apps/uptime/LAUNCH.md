@@ -83,9 +83,9 @@ Suggested subreddits: r/webdev, r/agency, r/web_design, r/ExperiencedDevs
 > - **Every finding carries the fix.** Not "missing HSTS" but the header to
 >   add, so you can hand it to whoever's on it.
 > - **Domain expiry says "unknown" when it is.** It uses RDAP, the free public
->   protocol that replaced WHOIS. Several country registries — `.in` is the one
->   Indian agencies hit — publish thin records or none. It says unknown rather
->   than guessing a date.
+>   protocol that replaced WHOIS, asking whichever registry IANA names as
+>   authoritative — `.in` and `.co.in` included. A few registries still publish
+>   nothing or rate-limit lookups. It says unknown rather than guessing a date.
 > - **The status page re-checks daily, not on page load.** A burst of live
 >   requests to your clients' servers on every visitor would be a DoS you'd be
 >   running against your own clients. It refreshes once a day on a schedule and
@@ -125,8 +125,8 @@ For agency-owner and freelance-dev communities. Keep it to the pain.
 > [link]
 >
 > Genuinely free for the manual check, and it's the full check. Would like to
-> know which of your clients' TLDs it can't get expiry for — `.in` and a few
-> ccTLDs don't publish it and I want to know how big that gap is.
+> know which of your clients' TLDs it can't get expiry for — most answer,
+> `.in` and `.co.in` among them, but I want to know how big the gap is.
 
 ---
 

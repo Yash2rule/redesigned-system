@@ -516,9 +516,10 @@ async function rdapBaseFor(tld: string): Promise<string | null> {
  * so pinning it to a `.com` server makes every `.in` domain look unregistered.
  * It exists for tests and for pinning a single-TLD deployment, not as a fix.
  *
- * Not every registry serves RDAP: several ccTLDs, `.in` among them, return
- * thin records or nothing at all. When that happens we report "unknown" and
- * say why, rather than presenting a guessed date as fact.
+ * Not every registry serves RDAP, and when one doesn't we report "unknown"
+ * and say why, rather than presenting a guessed date as fact. `.in` used to
+ * be listed here as an example of that; it is not one. It answers in full,
+ * `.co.in` included — the redirector was the thing that never worked.
  */
 export async function checkDomain(hostname: string): Promise<DomainCheck> {
   const unavailable = (message: string): DomainCheck => ({
@@ -548,7 +549,7 @@ export async function checkDomain(hostname: string): Promise<DomainCheck> {
     }
     if (!base) {
       return unavailable(
-        `.${tld} has no RDAP service listed with IANA, so expiry cannot be looked up. Several country registries don't publish it this way.`,
+        `.${tld} has no RDAP service listed with IANA, so expiry cannot be looked up. A few country registries still don't publish one.`,
       );
     }
     query = `${base}domain/${encodeURIComponent(registrable)}`;
@@ -565,7 +566,7 @@ export async function checkDomain(hostname: string): Promise<DomainCheck> {
     }
     if (!response.ok) {
       return unavailable(
-        `${registrable}'s registry did not answer over RDAP (${response.status}). Several country registries, .in among them, don't publish expiry this way.`,
+        `${registrable}'s registry did not answer over RDAP (${response.status}). Some registries rate-limit or refuse automated lookups.`,
       );
     }
     const parsed = parseRdap(await response.json());
