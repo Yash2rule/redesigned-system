@@ -26,7 +26,8 @@ export async function GET(request: Request): Promise<Response> {
       };
     }
   };
-  await time("getProbeStates", () => store.getProbeStates());
+  await time("getProbeStates_first", () => store.getProbeStates());
+  await time("getProbeStates_again", () => store.getProbeStates());
   await time("corpusCounts", () => store.corpusCounts());
   await time("recentIntents", () => store.recentIntents(5));
   await time("funnel", () => store.funnel());

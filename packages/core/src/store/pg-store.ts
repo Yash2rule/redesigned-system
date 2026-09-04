@@ -127,7 +127,7 @@ export class PgStore implements Store {
       max_lifetime: 60 * 10,
       prepare: false,
       connect_timeout: 10,
-      connection: { statement_timeout: QUERY_DEADLINE_MS + 5_000 },
+      connection: { statement_timeout: "60s" },
     });
     this.db = drizzle(this.sql, { schema: t });
     this.migrated = null;
