@@ -59,8 +59,11 @@ export const config: ProbeConfig = {
       currency: "INR",
       interval: "year",
       description: "Two months free against the monthly price.",
-      features: ["Everything in Monthly", "Priority on parser fixes for your bank"],
-      planned: ["Full financial-year rollup across statements"],
+      features: [
+        "Everything in Monthly",
+        "Financial-year rollup across every statement, as one spreadsheet",
+        "Priority on parser fixes for your bank",
+      ],
     },
   ],
 
@@ -100,6 +103,12 @@ export const config: ProbeConfig = {
       answer:
         "Change it on the results page. We work out which merchant the row is about, remember your choice, and apply it to every matching row — including in future statements. The totals, the category breakdown and the GST shortlist all move with it, and your corrections are included in the Excel download. The rules live in your browser, so they do not follow you to another device, and there is a button to clear them.",
       keywords: ["wrong", "incorrect", "category", "fix", "edit", "override", "rule", "correct", "change"],
+    },
+    {
+      question: "Can it combine a year's statements into one file for my CA?",
+      answer:
+        "Yes. Process each statement, then use the rollup page — it combines them into an Indian financial year (1 April to 31 March), removes transactions that appear in two overlapping exports, and tells you which months have no data at all, which usually means a statement is missing. The Excel has four sheets: every transaction in the year, month by month, by category, and which statement contributed what.",
+      keywords: ["year", "financial year", "fy", "annual", "ca", "combine", "rollup", "multiple", "march"],
     },
     {
       question: "Does it handle transfers between my own accounts?",

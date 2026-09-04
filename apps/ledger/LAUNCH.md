@@ -32,7 +32,7 @@ guessed silently: every category shows the keyword that produced it.
 | First statement | Free | Complete, Excel export included. |
 | One statement | ₹149 | Per statement, no subscription. |
 | Monthly | ₹399/mo | Unlimited statements, saved category rules. |
-| Yearly | ₹3,990/yr | Two months free. |
+| Yearly | ₹3,990/yr | Two months free, plus the financial-year rollup. |
 
 **Disclaimer**
 Statement to Ledger provides bookkeeping and categorisation assistance, not
@@ -91,6 +91,12 @@ r/smallbusinessindia.
 > a CSV.
 >
 > First statement free, Excel included. Not taking payments yet.
+>
+> In March it will also combine every statement you have processed into one
+> Indian financial year — 1 April to 31 March — removing transactions that
+> appear in two overlapping exports, and telling you which months have no data
+> at all, because that usually means a missing statement rather than a quiet
+> month. That is the file to send a CA.
 >
 > **What I want:** if your bank's export doesn't parse, paste me the header row
 > (just the header — no amounts, nothing identifying) and I'll add it. Same for

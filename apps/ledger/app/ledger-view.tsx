@@ -14,6 +14,7 @@ import {
 import type { LedgerResult } from "../lib/ledger.ts";
 import { CATEGORIES } from "../lib/categorise.ts";
 import type { CategoryId } from "../lib/categorise.ts";
+import { saveStatement, readSavedStatements } from "../lib/saved.ts";
 import {
   applyOverrides,
   clearOverrides,
@@ -38,9 +39,13 @@ export function LedgerView() {
   const [showAll, setShowAll] = useState(false);
   const [filter, setFilter] = useState<string>("all");
   const [overrides, setOverrides] = useState<Overrides>({});
+  const [savedCount, setSavedCount] = useState(0);
 
   // Corrections live in this browser; they are only readable after mount.
-  useEffect(() => setOverrides(readOverrides()), []);
+  useEffect(() => {
+    setOverrides(readOverrides());
+    setSavedCount(readSavedStatements().length);
+  }, []);
 
   // The displayed ledger is always the raw one with corrections layered on,
   // so totals and the GST list move when a category is fixed.
@@ -57,6 +62,17 @@ export function LedgerView() {
     const typed = payload as { id?: string; result?: LedgerResult };
     if (typed.result) {
       setRaw(typed.result);
+      // Remember it so several statements can be rolled into one financial year.
+      if (typed.id) {
+        saveStatement({
+          id: typed.id,
+          label: `${typed.result.totals.count} transactions`,
+          from: typed.result.period.from,
+          to: typed.result.period.to,
+          savedAt: new Date().toISOString(),
+        });
+        setSavedCount(readSavedStatements().length);
+      }
       setArtifactId(typed.id ?? null);
       setShowAll(false);
       requestAnimationFrame(() =>
@@ -91,6 +107,7 @@ export function LedgerView() {
             clearOverrides();
             setOverrides({});
           }}
+          savedCount={savedCount}
         />
       ) : null}
     </div>
@@ -107,6 +124,7 @@ function Result({
   overrides,
   onCorrect,
   onClearOverrides,
+  savedCount,
 }: {
   result: LedgerResult;
   artifactId: string | null;
@@ -117,6 +135,7 @@ function Result({
   overrides: Overrides;
   onCorrect: (narration: string, category: CategoryId) => void;
   onClearOverrides: () => void;
+  savedCount: number;
 }) {
   const filtered =
     filter === "all" ? result.entries : result.entries.filter((e) => e.category === filter);
@@ -344,6 +363,21 @@ function Result({
               : ""}
           </p>
         </div>
+      ) : null}
+
+      {savedCount >= 2 ? (
+        <div className="mt-6">
+          <a
+            href="/rollup"
+            className="inline-flex rounded-lg border border-[var(--line)] px-5 py-3 text-sm font-semibold"
+          >
+            Combine your {savedCount} statements into one financial year
+          </a>
+        </div>
+      ) : savedCount === 1 ? (
+        <p className="mt-6 text-[13px] text-[var(--muted)]">
+          Process another statement and you can roll them into one financial year for your CA.
+        </p>
       ) : null}
     </div>
   );

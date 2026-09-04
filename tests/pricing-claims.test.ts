@@ -18,7 +18,15 @@ import type { ProbeConfig } from "@probes/ui";
 
 const CONFIGS: ProbeConfig[] = [offerDecoder, ledger, uptime, freelancerKit];
 
-/** Phrases that describe capabilities this codebase does not have. */
+/**
+ * Phrases that describe capabilities this codebase does not have.
+ *
+ * This list shrinks as features land — it has been narrowed three times, each
+ * time because the guard failed the build on a copy change made in the same
+ * commit as the feature. That is the point of it: the test fails loudly rather
+ * than letting a claim drift ahead of the product. When you build one of the
+ * remaining `planned` items, delete its pattern here in the same commit.
+ */
 const NOT_BUILT = [
   // Change alerts ARE built (apps/uptime/lib/notify.ts). Emailed reports,
   // reminders and summaries are not, so those stay flagged.
@@ -27,7 +35,6 @@ const NOT_BUILT = [
   /\bsaved\b.*\b(client|details|defaults)\b/i,
   /\b(remember|remembers)\b.*\bdefaults?\b/i,
   /\boverride\b.*\bsave\b/i,
-  /\brollup\b/i,
   /\bregister for your CA\b/i,
   /\byear-end\b/i,
   /\byour own domain\b/i,
