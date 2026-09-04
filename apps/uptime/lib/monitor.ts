@@ -253,13 +253,60 @@ export async function runMonitor(rawTarget: string): Promise<MonitorResult> {
 }
 
 /** Split a textarea of domains, one per line or comma-separated. */
-export function parseTargets(raw: string): string[] {
-  const targets = raw
-    .split(/[\n,]/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith("#"));
+/** A run of domains that all belong to the same client. */
+export type TargetGroup = { client: string | null; targets: string[] };
 
-  const unique = [...new Set(targets.map((t) => t.toLowerCase()))];
+/**
+ * Splits the textarea into clients.
+ *
+ * A line starting with `#` names the client that the domains beneath it belong
+ * to, and applies until the next such line. Domains above the first one, or in
+ * a list with no `#` at all, have no client — which is the common case and has
+ * to stay effortless.
+ *
+ *     # Acme Ltd
+ *     acme.com
+ *     shop.acme.com
+ *     # Borden & Co
+ *     borden.in
+ *
+ * `#` lines were already discarded as comments before this existed, so nothing
+ * that worked before parses differently now.
+ */
+export function parseTargetGroups(raw: string): TargetGroup[] {
+  const groups: TargetGroup[] = [];
+  let current: TargetGroup = { client: null, targets: [] };
+  const seen = new Set<string>();
+
+  // Split on newlines first: a client header owns its whole line, whereas
+  // domains may still be comma-separated within one.
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+
+    if (trimmed.startsWith("#")) {
+      const name = trimmed.replace(/^#+/, "").trim().slice(0, 60);
+      if (current.targets.length > 0) groups.push(current);
+      current = { client: name.length > 0 ? name : null, targets: [] };
+      continue;
+    }
+
+    for (const part of trimmed.split(",")) {
+      const target = part.trim().toLowerCase();
+      // Deduplicate across the whole list, not within a group: a domain
+      // belongs to whichever client claimed it first.
+      if (target.length === 0 || seen.has(target)) continue;
+      seen.add(target);
+      current.targets.push(target);
+    }
+  }
+  if (current.targets.length > 0) groups.push(current);
+
+  return groups;
+}
+
+export function parseTargets(raw: string): string[] {
+  const unique = parseTargetGroups(raw).flatMap((group) => group.targets);
   if (unique.length === 0) {
     throw new UserFacingError("Enter at least one domain, one per line.", 400);
   }

@@ -13,14 +13,18 @@ const TONE: Record<Severity, "bad" | "warn" | "neutral" | "good"> = {
   ok: "good",
 };
 
-const SAMPLE = `example.com
+const SAMPLE = `# Acme Ltd
+example.com
 wikipedia.org
+
+# Borden & Co
 https://developer.mozilla.org`;
 
 export function Checker() {
   const [targets, setTargets] = useState("");
   const [brandName, setBrandName] = useState("");
   const [brandColor, setBrandColor] = useState("#7c3aed");
+  const [logoUrl, setLogoUrl] = useState("");
   const [alertEmail, setAlertEmail] = useState("");
   const [alerts, setAlerts] = useState<{ address: string; live: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -42,7 +46,7 @@ export function Checker() {
       const response = await fetch("/api/check", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ targets, brandName, brandColor, alertEmail }),
+        body: JSON.stringify({ targets, brandName, brandColor, logoUrl, alertEmail }),
       });
       const payload = (await response.json()) as {
         id?: string;
@@ -85,7 +89,9 @@ export function Checker() {
           />
           <span className="mt-1 block text-[12px] text-[var(--muted)]">
             Up to eight at a time. No account needed. We make one ordinary request per site and
-            read its certificate — we never log in or crawl.
+            read its certificate — we never log in or crawl. Start a line with{" "}
+            <code className="font-mono">#</code> to name a client, and the domains under it are
+            summarised separately — useful when one list covers several clients.
           </span>
         </label>
 
@@ -113,6 +119,22 @@ export function Checker() {
             />
           </label>
         </div>
+
+        <label className="mt-4 block text-sm">
+          <span className="mb-1.5 block font-medium">Your logo (optional)</span>
+          <input
+            type="url"
+            value={logoUrl}
+            onChange={(e) => setLogoUrl(e.target.value)}
+            placeholder="https://youragency.com/logo.svg"
+            maxLength={300}
+            className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2.5 text-sm"
+          />
+          <span className="mt-1 block text-[12px] text-[var(--muted)]">
+            An https link to an image you already host — it goes at the top of the status page.
+            We don&apos;t upload or copy it, the browser loads it from your site.
+          </span>
+        </label>
 
         <label className="mt-4 block text-sm">
           <span className="mb-1.5 block font-medium">

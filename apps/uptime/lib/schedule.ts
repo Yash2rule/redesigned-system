@@ -3,6 +3,7 @@ import type { Json } from "@probes/core";
 import { runChecks } from "./monitor.ts";
 import type { CheckRunResult, Severity } from "./monitor.ts";
 import { diffChecks, notifyChanges, sendWeeklyReport } from "./notify.ts";
+import type { Brand } from "./brand.ts";
 
 /**
  * Scheduled re-checks.
@@ -22,7 +23,13 @@ export type HistoryEntry = {
 };
 
 export type MonitorSet = CheckRunResult & {
-  brand?: { name: string; color: string };
+  brand?: Brand;
+  /**
+   * hostname -> client name, from the "# Client" headings in the textarea.
+   * Absent or empty means the agency did not name any, which is the common
+   * case; the status page then shows one flat list as it always did.
+   */
+  clients?: Record<string, string>;
   /** Newest first, capped. */
   history?: HistoryEntry[];
   /** Where to send change alerts. Empty means the owner did not ask for any. */

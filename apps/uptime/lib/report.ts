@@ -2,11 +2,63 @@ import { renderPdf } from "@probes/core/server";
 import type { PdfSection } from "@probes/core/server";
 import { config } from "./config.ts";
 import type { CheckRunResult } from "./monitor.ts";
+import { summariseByClient } from "./clients.ts";
+import { UserFacingError } from "@probes/core";
 
-export type BrandedResult = CheckRunResult & { brand?: { name: string; color: string } };
+export type BrandedResult = CheckRunResult & {
+  brand?: { name: string; color: string };
+  clients?: Record<string, string>;
+};
+
+/**
+ * Narrows a result to one client's domains.
+ *
+ * This is the difference between "a report" and "a report you can actually
+ * send". An agency monitoring six clients in one list cannot forward the whole
+ * thing to any of them — it names the other five. Passing a client here
+ * produces a PDF with only their sites in it, and totals that are theirs.
+ */
+export function forClient(result: BrandedResult, client: string): BrandedResult {
+  const summaries = summariseByClient(result.monitors, result.clients ?? {});
+  const match = summaries.find(
+    (s) => s.client !== null && s.client.toLowerCase() === client.trim().toLowerCase(),
+  );
+  if (!match) {
+    throw new UserFacingError(`No client called "${client.slice(0, 60)}" in this check.`, 404);
+  }
+
+  // Narrow the assignment map too, not just the monitors. It maps every
+  // hostname in the check to its client, so carrying it whole would put the
+  // other clients' domains — and their names — inside a document written to be
+  // forwarded to this one.
+  const kept = new Set(match.monitors.flatMap((m) => [m.input.toLowerCase(), m.hostname.toLowerCase()]));
+  const clients = Object.fromEntries(
+    Object.entries(result.clients ?? {}).filter(([host]) => kept.has(host.toLowerCase())),
+  );
+
+  return {
+    ...result,
+    monitors: match.monitors,
+    clients,
+    summary: {
+      total: match.counts.total,
+      critical: match.counts.critical,
+      warning: match.counts.warning,
+      healthy: match.counts.healthy,
+    },
+  };
+}
 
 /** The weekly client report, as a PDF an agency can forward without editing. */
-export async function buildStatusReport(result: BrandedResult): Promise<Buffer> {
+export async function buildStatusReport(
+  result: BrandedResult,
+  client?: string,
+): Promise<Buffer> {
+  const scoped = client ? forClient(result, client) : result;
+  return buildReportFor(scoped, client ?? null);
+}
+
+async function buildReportFor(result: BrandedResult, client: string | null): Promise<Buffer> {
   const brandName = result.brand?.name?.trim();
 
   const sections: PdfSection[] = [
@@ -35,6 +87,25 @@ export async function buildStatusReport(result: BrandedResult): Promise<Buffer> 
       ]),
     },
   ];
+
+  // Only on the whole-portfolio report: a single client's PDF is already
+  // about one client, so a breakdown table would have exactly one row.
+  if (!client) {
+    const summaries = summariseByClient(result.monitors, result.clients ?? {});
+    if (summaries.some((s) => s.client !== null)) {
+      sections.push({ type: "heading", text: "By client" });
+      sections.push({
+        type: "table",
+        columns: ["Client", "Sites", "Needs attention", "Worth watching"],
+        rows: summaries.map((summary) => [
+          summary.client ?? "Not assigned",
+          String(summary.counts.total),
+          String(summary.counts.critical),
+          String(summary.counts.warning),
+        ]),
+      });
+    }
+  }
 
   for (const monitor of result.monitors) {
     sections.push({ type: "heading", text: monitor.hostname });
@@ -77,7 +148,7 @@ export async function buildStatusReport(result: BrandedResult): Promise<Buffer> 
   sections.push({ type: "bullets", items: result.limitations });
 
   return renderPdf({
-    title: brandName ? `${brandName} — site health report` : "Site health report",
+    title: [brandName, client, "site health report"].filter(Boolean).join(" — "),
     subtitle: `${result.summary.total} sites · ${result.summary.critical} needing attention · ${new Date(result.checkedAt).toDateString()}`,
     disclaimer: config.disclaimer,
     footerBrand: brandName || config.name,

@@ -10,7 +10,10 @@ import {
   readSessionId,
   withSessionCookie,
 } from "@probes/app-kit";
-import { parseTargets, runChecks } from "../../../lib/monitor.ts";
+import { parseTargetGroups, parseTargets, runChecks } from "../../../lib/monitor.ts";
+import { clientAssignments } from "../../../lib/clients.ts";
+import { normaliseLogoUrl } from "../../../lib/brand.ts";
+import type { Brand } from "../../../lib/brand.ts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -53,6 +56,7 @@ export async function POST(request: Request): Promise<Response> {
     targets?: unknown;
     brandName?: unknown;
     brandColor?: unknown;
+    logoUrl?: unknown;
     alertEmail?: unknown;
   };
   try {
@@ -70,20 +74,26 @@ export async function POST(request: Request): Promise<Response> {
   });
   await track({ probe: "uptime", sessionId, name: "upload_started", props: {} });
 
+  const rawTargets = typeof body.targets === "string" ? body.targets : "";
   let targets: string[];
   try {
-    targets = parseTargets(typeof body.targets === "string" ? body.targets : "");
+    targets = parseTargets(rawTargets);
   } catch (error) {
     if (isUserFacingError(error)) return json({ error: error.message }, error.status);
     throw error;
   }
 
   const result = await runChecks(targets);
-  const brand = {
+  // A "# Client name" line in the textarea assigns the domains under it, so an
+  // agency can get a summary per client rather than one number for the lot.
+  const clients = clientAssignments(parseTargetGroups(rawTargets));
+  const logoUrl = normaliseLogoUrl(body.logoUrl);
+  const brand: Brand = {
     name: typeof body.brandName === "string" ? body.brandName.slice(0, 60).trim() : "",
     color: typeof body.brandColor === "string" && /^#[0-9a-f]{6}$/i.test(body.brandColor)
       ? body.brandColor
       : "#7c3aed",
+    ...(logoUrl ? { logoUrl } : {}),
   };
 
   // One address, validated. Change alerts go here when the daily re-check
@@ -102,6 +112,7 @@ export async function POST(request: Request): Promise<Response> {
       payload: {
         ...result,
         brand,
+        clients,
         history: [],
         alertEmails: alertEmail ? [alertEmail] : [],
         // The first weekly summary lands a week from now — they have just

@@ -38,9 +38,11 @@ const NOT_BUILT = [
   /\bsaved\b.*\b(client|details|defaults)\b/i,
   /\b(remember|remembers)\b.*\bdefaults?\b/i,
   /\boverride\b.*\bsave\b/i,
+  // A logo on the status page is built (apps/uptime/lib/brand.ts). A custom
+  // domain and hourly re-checks are not, and both need infrastructure rather
+  // than code, so they stay flagged.
   /\byour own domain\b/i,
   /\bhourly\b/i,
-  /\blogo\b/i,
 ];
 
 describe.each(CONFIGS.map((c) => [c.id, c] as const))("%s pricing", (_id, config) => {

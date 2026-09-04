@@ -54,11 +54,12 @@ export const config: ProbeConfig = {
         "Up to 150 monitors",
         "Per-client status pages",
         "Client-ready PDF report, on demand",
+        "A separate summary and PDF per client, not per monitor set",
+        "Your logo on the status page",
       ],
       planned: [
-        "Your logo and your own domain on the status page",
+        "Your own domain for the status page",
         "Hourly re-checks instead of daily",
-        "A separate summary per client, not per monitor set",
       ],
     },
   ],
@@ -97,7 +98,7 @@ export const config: ProbeConfig = {
     {
       question: "Can I put it on my own domain?",
       answer:
-        "On the Agency plan, yes — status.youragency.com via a CNAME. On Studio the status page lives on our domain but carries your name and colour.",
+        "Not yet — that one is genuinely not built. It needs DNS and a certificate per customer, which we are not set up for. What works today is your name, your colour and your logo on a status page that lives on our domain. Your own domain is on the Agency plan as a planned item, and the pricing page says so rather than implying otherwise.",
       keywords: ["white label", "domain", "cname", "brand", "logo", "custom"],
     },
     {
