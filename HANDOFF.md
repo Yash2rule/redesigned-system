@@ -479,6 +479,26 @@ but tested is not the same as reviewed, and this is the one probe where being
 wrong costs a user real money and real credibility with their client's accounts
 team.
 
+**You are not blocked on this, and it is worth being clear about why.** The
+app never claims compliance: its disclaimer says invoices are generated
+against the particulars the CGST Rules require and tells people to have a
+chartered accountant check anything they intend to file. That is honest
+without a review. What the review buys is a stronger claim, not permission to
+ship — and `LAUNCH.md` already forbids the words "GST-compliant" in the post
+until it happens.
+
+**If you have no CA and no contacts,** you do not need an introduction: ICAI
+publishes a member and firm directory searchable by city, and ClearTax,
+Quicko, TaxBuddy, IndiaFilings and Vakilsearch all sell one-off consultations
+for roughly ₹500–3,000. Whoever filed your last return is cheaper still. This
+is an hour of routine work for any practising CA, not a favour.
+
+**The four invoices are already generated** — one of each shape, from the
+deployed app, arithmetic checked: ₹1,50,000 base, ₹27,000 tax in both taxable
+cases, split correctly each way, no tax and no "Tax Invoice" heading on the
+unregistered one. Regenerate them any time from the invoice tool, or ask for
+the four payloads.
+
 Have a CA check one invoice of each of these four shapes before you describe it
 publicly as GST-compliant:
 
@@ -564,6 +584,11 @@ Each probe has a `LAUNCH.md` with three ready-to-post pieces and a
 
 1. **freelancer-kit** — but only after item 8. Sharpest hook (the 44ADA
    single-instalment rule), most defensible claim, clearest audience.
+
+   **If item 8 has not happened, this is not first — offer-decoder is.** The
+   only thing putting freelancer-kit at the top is a review that makes its
+   claim the most defensible of the four. Waiting on someone else's hour to
+   launch anything at all is the wrong trade: the probe below needs nobody.
 2. **offer-decoder** — biggest audience, easiest to explain in five seconds.
    Post to r/developersIndia when you can sit with the thread for two hours.
 3. **ledger** — the Show HN is the strongest piece of writing of the eight,
