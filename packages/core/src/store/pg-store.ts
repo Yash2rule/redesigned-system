@@ -116,8 +116,21 @@ export class PgStore implements Store {
    */
   private connect(): void {
     this.sql = postgres(this.url, {
-      max: 3,
-      idle_timeout: 20,
+      // One connection per process, not three.
+      //
+      // The budget is the whole deployment's, not this process's: five apps,
+      // several routes each, and a fresh instance per concurrent request, all
+      // against one pooler whose free tier allows a couple of dozen server
+      // connections. At three apiece that ceiling arrives quickly, and when it
+      // does the pooler does not refuse the connection — it queues it, so the
+      // symptom is a query that never returns rather than an error that says
+      // what happened. Nothing here fans out inside a single request, so the
+      // extra two bought nothing anyway.
+      max: 1,
+      // Give an idle connection back quickly. An instance that is about to be
+      // frozen between requests should be holding as little as possible.
+      idle_timeout: 10,
+      max_lifetime: 60 * 10,
       prepare: false,
       connect_timeout: 10,
       connection: { statement_timeout: QUERY_DEADLINE_MS + 5_000 },
