@@ -124,6 +124,34 @@ There is no undo, which is why it asks twice.
 **Why:** Nothing is deployed. Five projects, one per app, each independently
 deployable from this monorepo.
 
+There are two ways in. **Prefer the Git integration** — it needs no token on
+any machine but yours, and it redeploys on every push afterwards.
+
+### a. Git integration (recommended)
+
+**Merge the pull request first.** Vercel builds the *production branch*, which
+is `main`, and `main` currently has almost nothing on it. Connecting Vercel
+before merging gets you five deployments of an empty repository.
+
+Then, in the Vercel dashboard, five times — once per app:
+
+```
+Add New → Project → import Yash2rule/redesigned-system
+  Root Directory        apps/<offer-decoder|ledger|uptime|freelancer-kit|admin>
+  Include files outside the Root Directory   ON      ← required
+  Framework                                  Next.js (auto-detected)
+```
+
+Leave build and install commands alone; each app's `vercel.json` already sets
+them. That checkbox is not optional: the build command starts with `cd ../..`
+because the install has to happen at the workspace root, and without it Vercel
+only uploads the app folder and the build fails on a missing lockfile.
+
+Give each project a distinct name — `probe-offer-decoder`, `probe-ledger`, and
+so on. The admin one is worth naming so you recognise it in a hurry.
+
+### b. CLI, if you would rather
+
 ```bash
 npm i -g vercel && vercel login
 pnpm deploy:all          # preview URLs
@@ -131,8 +159,18 @@ pnpm deploy:all -- --prod
 ```
 
 The script prompts once per app to link a project — give each a distinct name.
-Each app already has a `vercel.json` with the right build command and region
-(Mumbai for the three rupee-priced probes, US East for the dollar-priced one).
+
+### Two things that may bite on the Hobby plan
+
+**Region.** Each `vercel.json` pins a region — Mumbai (`bom1`) for the three
+rupee-priced probes, US East (`iad1`) for the dollar-priced one — because
+latency from India matters for the first three. If Vercel refuses the region on
+your plan, delete the `regions` line. It affects speed, never correctness.
+
+**Commercial use.** Vercel's Hobby plan is for non-commercial projects, and
+these are products you intend to charge for. Free is fine while the buttons
+only record purchase intent. Read their current fair-use terms before you turn
+a real payment rail on, and budget for Pro if that is what it says.
 
 After deploying, set `DATABASE_URL` (item 1) on every project and
 `ADMIN_PASSWORD` (item 2) on admin, then redeploy.
