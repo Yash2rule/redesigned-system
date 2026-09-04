@@ -317,13 +317,27 @@ pooler, and a failed migration no longer caches itself as a promise that never
 settles — which is what made the failure total and identical rather than
 intermittent, and why a redeploy appeared to fix it every time.
 
-**One piece of drift to clear.** Iterating on this exhausted Vercel's free
-limit of 100 API-created deployments per day, so `ledger`, `uptime` and
-`freelancer-kit` are still running the build from before the last two store
-commits. All three were re-tested afterwards and are healthy — the fault was
-only ever in the dashboard's parallel reads — but they are behind. One
-`pnpm provision` once the quota resets aligns them, and a merge to `main`
-would do it through the Git integration instead, which is a separate quota.
+**Drift to clear, and one thing to clear urgently.** Iterating on this
+exhausted Vercel's free limit of 100 API-created deployments in a day, and
+Git-triggered deployments share that limit, so the merge to `main` did not
+deploy either. The quota resets 2026-09-05 15:28 UTC. Until something
+deploys after that:
+
+| Project | Live build | Behind by |
+| --- | --- | --- |
+| offer-decoder | `8f56751` | nothing — current |
+| admin | `fab4d39` | the diagnostic-endpoint removal |
+| ledger, uptime, freelancer-kit | `ce0f030` | the last two store commits |
+
+All five were re-tested on those builds and all five are healthy — the fault
+was only ever in the dashboard's parallel reads, which `fab4d39` fixes.
+
+**The urgent one: `/api/diag` is still live on the admin project.** Its
+removal only ever reached a preview deployment. It is gated behind the admin
+cookie, so it is not open to the internet, but it returns internal error text
+and stack frames and it should not outlive the bug it was written for. The
+next deployment of `main` removes it. If that slips, delete it by hand rather
+than leaving it.
 
 ---
 
