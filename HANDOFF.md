@@ -4,7 +4,8 @@ Everything that needs you. In order. Nothing else was left for you — design,
 copy, schema, naming, pricing, sample data and tests are all done and
 committed.
 
-**Push status: blocked — see item 0 first.**
+**Push status: pushed.** The branch is on GitHub — item 0 has the link. No
+pull request has been opened; that is your call.
 
 **Deployment status: not deployed.** No Vercel, Supabase or Neon credentials
 existed in the build environment, so there are no preview URLs to record. The
@@ -25,69 +26,50 @@ one more thing.
 
 ---
 
-## 0. BLOCKED: push access to this repository
+## 0. Done: the branch is on GitHub
 
-**This is the only item that was blocked rather than deferred, and it is why
-you are reading this in a local clone rather than on GitHub.**
-
-All the work is committed to the branch
-`claude/validation-probes-overnight-uok5hp`, but the push was refused:
+**This item was blocked for most of the build and is now resolved.** You
+reconnected the GitHub App, and everything pushed:
 
 ```
-remote: Claude doesn't have GitHub access to Yash2rule/redesigned-system
-        for your organization.
-fatal: unable to access '...': The requested URL returned error: 403
+https://github.com/Yash2rule/redesigned-system/tree/claude/validation-probes-overnight-uok5hp
 ```
 
-This is an app-installation permission, not a credential problem. I tested
-every route available to this session so you do not have to:
+34 commits, each self-contained, in the order the work was done — `git log
+--oneline` reads as a build log. Verified: the remote branch and the local
+branch are the same commit, with nothing unpushed.
 
-| Route | Result |
+No pull request has been opened. That is deliberate — you did not ask for one,
+and it is your call whether this lands on `main` as a PR or gets merged
+directly. To open one:
+
+```bash
+gh pr create --base main --head claude/validation-probes-overnight-uok5hp
+```
+
+Nothing below this line depends on it any more. Start at item 1.
+
+<details>
+<summary>What the block was, for the record</summary>
+
+`git push` returned 403 — "Claude doesn't have GitHub access to
+Yash2rule/redesigned-system for your organization" — while reads worked fine.
+It was an app-installation permission, not a credential problem:
+
+| Route | Result while blocked |
 | --- | --- |
 | `git push` | 403 from the git proxy |
-| `git fetch origin main` | works — reads are fine |
-| GitHub API with the session's `GITHUB_TOKEN` | authenticates as `Yash2rule`, but every repo-scoped call returns "GitHub access is not enabled for this session" |
-| `GET /repos/.../git/refs` with that token | 403 |
-| GitHub MCP read (`list_branches`) | works — shows `main` only, so nothing of mine reached the remote |
+| `git fetch origin main` | worked — reads were fine |
+| GitHub API with the session's `GITHUB_TOKEN` | authenticated as `Yash2rule`, but every repo-scoped call returned "GitHub access is not enabled for this session" |
+| GitHub MCP read (`list_branches`) | worked — showed `main` only |
 | GitHub MCP write (`create_branch`) | 403 "Resource not accessible by integration" |
 
-Reads work through one path; every write is refused at the integration level.
-There is no route around it from inside this session.
+Reinstalling or re-scoping the Claude GitHub App fixed it. Worth knowing if a
+future session hits the same wall: there is no route around it from inside the
+session, and the fallback was a `git bundle` sent through the conversation,
+which round-trips to an identical HEAD with no history lost.
 
-**Fix, either one:**
-
-- Install or re-scope the Claude GitHub App for the organisation:
-  https://github.com/apps/claude/installations/select_target
-- Or reconnect GitHub from your own account settings:
-  https://claude.ai/customize/connectors?auth_start=github&auth_start_force=1
-
-**Then push it yourself** — the commits are already made and the branch already
-exists locally:
-
-```bash
-git -C <this-repo> push -u origin claude/validation-probes-overnight-uok5hp
-```
-
-Fifteen commits, each self-contained, in the order the work was done.
-`git log --oneline` reads as a build log.
-
-### If this session's container is gone before you get to it
-
-The container is ephemeral, so I also wrote a git bundle — a single file
-containing every commit and all history — and sent it to you in the
-conversation. It is also at `validation-probes.bundle` in the home directory
-of this session.
-
-Restoring from it loses nothing:
-
-```bash
-git clone validation-probes.bundle redesigned-system   -b claude/validation-probes-overnight-uok5hp
-cd redesigned-system
-git remote set-url origin https://github.com/Yash2rule/redesigned-system
-git push -u origin claude/validation-probes-overnight-uok5hp
-```
-
-I verified this round-trips: 15 commits, 236 files, identical HEAD.
+</details>
 
 ---
 
