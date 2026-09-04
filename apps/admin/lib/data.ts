@@ -64,12 +64,19 @@ const pct = (numerator: number, denominator: number): number =>
 
 export async function loadDashboard(): Promise<Dashboard> {
   const store = getStore();
-  const [funnels, states, corpus, recentIntents] = await Promise.all([
-    store.funnel(),
-    store.getProbeStates(),
-    store.corpusCounts(),
-    store.recentIntents(40),
-  ]);
+  // Sequential, not Promise.all, and that is not an oversight.
+  //
+  // These four reads in parallel put four concurrent demands on a connection
+  // pool of three, against a shared pooler. Run that way the page failed
+  // almost every time while the identical four calls, made one after another,
+  // returned in about twenty-five milliseconds together — measured against
+  // the live database, from the same deployment, on the same data. Whatever
+  // the contention is, it costs more than the parallelism ever saved: these
+  // are four small aggregates, and doing them in turn is imperceptible.
+  const funnels = await store.funnel();
+  const states = await store.getProbeStates();
+  const corpus = await store.corpusCounts();
+  const recentIntents = await store.recentIntents(40);
 
   const rows: ProbeRow[] = PROBES.map((probe) => {
     const funnel =

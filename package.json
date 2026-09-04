@@ -14,6 +14,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run typecheck",
     "deploy:all": "node scripts/deploy-all.mjs",
+    "provision": "node scripts/vercel-provision.mjs",
     "seed": "node --experimental-strip-types scripts/seed-demo-data.mts"
   },
   "devDependencies": {

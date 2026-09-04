@@ -1,8 +1,16 @@
 import { createServer } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { checkHttp, checkTls, parseRdap } from "./checks.ts";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+  checkDomain,
+  checkHttp,
+  checkTls,
+  parseRdap,
+  parseRdapBootstrap,
+  registrableDomain,
+  resetRdapBootstrap,
+} from "./checks.ts";
 import type { Severity } from "./monitor.ts";
 import { isPublicAddress, pinnedLookup } from "./safe-url.ts";
 import { parseTargets, runMonitor } from "./monitor.ts";
@@ -313,6 +321,160 @@ describe("parseRdap", () => {
     expect(parseRdap({}).ok).toBe(false);
     expect(parseRdap(null).ok).toBe(false);
     expect(parseRdap({ entities: [{ roles: ["registrar"] }] }).registrar).toBeNull();
+  });
+});
+
+describe("registrableDomain", () => {
+  it("takes the last two labels for an ordinary domain", () => {
+    expect(registrableDomain("www.example.com")).toBe("example.com");
+    expect(registrableDomain("example.com")).toBe("example.com");
+    expect(registrableDomain("a.b.c.example.dev")).toBe("example.dev");
+  });
+
+  // The bug this guards: `status.acme.co.in` looked up as "co.in" asks the
+  // registry about itself, not about the customer's domain.
+  it("takes three labels under a second-level suffix", () => {
+    expect(registrableDomain("status.acme.co.in")).toBe("acme.co.in");
+    expect(registrableDomain("acme.co.in")).toBe("acme.co.in");
+    expect(registrableDomain("shop.example.com.au")).toBe("example.com.au");
+  });
+
+  it("refuses a bare suffix rather than reporting on the registry", () => {
+    expect(registrableDomain("co.in")).toBeNull();
+    expect(registrableDomain("localhost")).toBeNull();
+    expect(registrableDomain("")).toBeNull();
+  });
+
+  it("is case-insensitive", () => {
+    expect(registrableDomain("WWW.Example.COM")).toBe("example.com");
+  });
+});
+
+describe("parseRdapBootstrap", () => {
+  const sample = {
+    version: "1.0",
+    services: [
+      [["com", "net"], ["http://rdap.verisign.example/", "https://rdap.verisign.example/"]],
+      [["in"], ["https://rdap.registry.example/in/v1"]],
+      [["broken"], []],
+    ],
+  };
+
+  it("maps every TLD in a service to its base URL", () => {
+    const map = parseRdapBootstrap(sample);
+    expect(map.get("com")).toBe("https://rdap.verisign.example/");
+    expect(map.get("net")).toBe("https://rdap.verisign.example/");
+  });
+
+  it("prefers https and normalises the trailing slash", () => {
+    const map = parseRdapBootstrap(sample);
+    expect(map.get("com")?.startsWith("https://")).toBe(true);
+    expect(map.get("in")).toBe("https://rdap.registry.example/in/v1/");
+  });
+
+  it("skips malformed entries instead of throwing", () => {
+    const map = parseRdapBootstrap(sample);
+    expect(map.has("broken")).toBe(false);
+    expect(parseRdapBootstrap(null).size).toBe(0);
+    expect(parseRdapBootstrap({ services: "nonsense" }).size).toBe(0);
+  });
+});
+
+describe("checkDomain", () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.RDAP_BASE_URL;
+    resetRdapBootstrap();
+  });
+
+  const jsonResponse = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+  it("asks IANA which registry owns the TLD, then asks that registry", async () => {
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes("data.iana.org")) {
+        return jsonResponse({ services: [[["com"], ["https://rdap.example/com/v1/"]]] });
+      }
+      return jsonResponse({
+        events: [{ eventAction: "expiration", eventDate: new Date(Date.now() + 40 * 86_400_000).toISOString() }],
+        status: ["client transfer prohibited"],
+      });
+    }) as typeof fetch;
+
+    const result = await checkDomain("www.example.com");
+    expect(calls[0]).toContain("data.iana.org");
+    expect(calls[1]).toBe("https://rdap.example/com/v1/domain/example.com");
+    expect(result.ok).toBe(true);
+    expect(result.source).toBe("rdap");
+    expect(result.daysRemaining).toBeGreaterThan(35);
+  });
+
+  it("caches the bootstrap rather than fetching it per domain", async () => {
+    let bootstrapFetches = 0;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("data.iana.org")) {
+        bootstrapFetches += 1;
+        return jsonResponse({ services: [[["com"], ["https://rdap.example/com/v1/"]]] });
+      }
+      return jsonResponse({ events: [{ eventAction: "expiration", eventDate: new Date().toISOString() }] });
+    }) as typeof fetch;
+
+    await checkDomain("one.com");
+    await checkDomain("two.com");
+    expect(bootstrapFetches).toBe(1);
+  });
+
+  it("says so plainly when the TLD has no RDAP service at all", async () => {
+    globalThis.fetch = (async () =>
+      jsonResponse({ services: [[["com"], ["https://rdap.example/com/v1/"]]] })) as typeof fetch;
+
+    const result = await checkDomain("example.example");
+    expect(result.ok).toBe(false);
+    expect(result.source).toBe("unavailable");
+    expect(result.error).toContain("no RDAP service listed with IANA");
+  });
+
+  it("reports the bootstrap being unreachable as itself, not as a missing domain", async () => {
+    globalThis.fetch = (async () => new Response("nope", { status: 403 })) as typeof fetch;
+
+    const result = await checkDomain("example.com");
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("IANA");
+    expect(result.error).not.toContain("unregistered");
+  });
+
+  it("never claims a registered domain is unregistered when the registry 403s", async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      if (String(input).includes("data.iana.org")) {
+        return jsonResponse({ services: [[["com"], ["https://rdap.example/com/v1/"]]] });
+      }
+      return new Response("denied", { status: 403 });
+    }) as typeof fetch;
+
+    const result = await checkDomain("example.com");
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("403");
+    expect(result.error).not.toContain("unregistered");
+  });
+
+  it("honours RDAP_BASE_URL and skips the bootstrap entirely", async () => {
+    const calls: string[] = [];
+    process.env.RDAP_BASE_URL = "https://pinned.example/domain/";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return jsonResponse({
+        events: [{ eventAction: "expiration", eventDate: new Date(Date.now() + 86_400_000).toISOString() }],
+      });
+    }) as typeof fetch;
+
+    const result = await checkDomain("example.com");
+    expect(calls).toEqual(["https://pinned.example/domain/example.com"]);
+    expect(result.ok).toBe(true);
   });
 });
 

@@ -80,7 +80,7 @@ export const config: ProbeConfig = {
     {
       question: "Why does domain expiry sometimes say unknown?",
       answer:
-        "We use RDAP, the free public registry protocol that replaced WHOIS. Most generic domains publish an expiry date through it. Several country registries — .in is the one Indian agencies hit most — publish thin records or none at all. When that happens we say unknown rather than guessing a date.",
+        "We use RDAP, the free public registry protocol that replaced WHOIS, asking the registry IANA names as authoritative for the domain's ending. Generic domains and .in — including .co.in — publish an expiry date through it. A few country registries still publish thin records or none, and some rate-limit automated lookups. When that happens we say unknown rather than guessing a date.",
       keywords: ["rdap", "whois", "expiry", "unknown", ".in", "domain", "registry"],
     },
     {

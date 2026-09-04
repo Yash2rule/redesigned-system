@@ -7,9 +7,9 @@ committed.
 **Push status: pushed.** The branch is on GitHub — item 0 has the link. No
 pull request has been opened; that is your call.
 
-**Deployment status: not deployed.** No Vercel, Supabase or Neon credentials
-existed in the build environment, so there are no preview URLs to record. The
-repo is deploy-ready and item 3 below is a 15-minute job.
+**Deployment status: all five are live, on one Supabase database, verified by
+use rather than by health check.** URLs are in item 3. Items 1, 2 and 3 are
+done; item 9a now has an answer and it is not the one that was expected.
 
 Before anything else, prove it runs on your machine:
 
@@ -97,6 +97,15 @@ themselves on first request — there is no migration step to run.
 
 Verify: open `<any-app>/api/health` and check `"database": true`.
 
+**Done — and note what proved it.** `"database": true` only means the variable
+is set and non-empty; it never opens a connection, so it cannot tell you the
+string is right. What proved it was running one real job through each probe and
+then opening the dashboard: a statement parsed on ledger, a GST invoice on
+freelancer-kit, two domains checked on uptime, an offer letter decoded on
+offer-decoder — and the admin deployment, which shares nothing with those four
+but the connection string, showed the badge `Postgres` and counted every one of
+them. That is the cross-deployment read the whole item exists for.
+
 ---
 
 ## 2. Admin password
@@ -111,6 +120,12 @@ openssl rand -base64 24
 
 Set it as `ADMIN_PASSWORD` on the `admin` project only. Minimum 8 characters.
 
+**Done.** A 32-character password was generated with the command above and set
+on `redesigned-system-admin`; it was handed over in the session that set it and
+is deliberately not written down here. `/api/health` on that project reports
+`"passwordSet": true`, and the dashboard was opened with it. To replace it:
+`ADMIN_PASSWORD=<new> pnpm provision --apps=admin`.
+
 The dashboard is also where you reach the people who left an email: download
 the list as CSV, or write them a message. That flow is dry-run by default,
 de-duplicates anyone who left their address on several probes, shows the exact
@@ -121,19 +136,19 @@ There is no undo, which is why it asks twice.
 
 ## 3. Vercel projects
 
-**Why:** Nothing is deployed. Five projects, one per app, each independently
-deployable from this monorepo.
+**Why:** Five projects, one per app, each independently deployable from this
+monorepo. One of them is live; four are not.
 
-There are two ways in. **Prefer the Git integration** — it needs no token on
-any machine but yours, and it redeploys on every push afterwards.
+There are three ways in. **Prefer the Git integration** — it needs no token on
+any machine but yours, and it redeploys on every push afterwards. Route **c**
+is the unattended one, and is where the two credential traps are written down.
 
 ### a. Git integration (recommended)
 
-**Merge the pull request first.** Vercel builds the *production branch*, which
-is `main`, and `main` currently has almost nothing on it. Connecting Vercel
-before merging gets you five deployments of an empty repository.
+`main` now carries all five apps, so there is nothing to merge first — Vercel
+builds the production branch and the production branch is complete.
 
-Then, in the Vercel dashboard, five times — once per app:
+In the Vercel dashboard, four times — once per app still missing:
 
 ```
 Add New → Project → import Yash2rule/redesigned-system
@@ -160,6 +175,47 @@ pnpm deploy:all -- --prod
 
 The script prompts once per app to link a project — give each a distinct name.
 
+### c. API, unattended — `pnpm provision`
+
+`scripts/vercel-provision.mjs` does the whole of this item from the REST API
+with a token and no prompts: creates each project, sets the root directory and
+the outside-files flag, writes `DATABASE_URL` (and `ADMIN_PASSWORD` on admin),
+triggers a production deploy from `main`, waits for the build, then checks
+`/api/health` actually answers *as the right probe* — a project pointed at the
+wrong root directory builds and serves perfectly happily, it just serves
+somebody else's app.
+
+```bash
+export VERCEL_TOKEN=...            # see the warning below
+export VERCEL_TEAM_ID=team_QII22sqhA7Awl93TStAbTxjd
+export DATABASE_URL=...            # the same Supabase string all five share
+export ADMIN_PASSWORD=...          # item 2
+pnpm provision                     # or: --dry-run, --verify-only, --apps=ledger,admin
+```
+
+It is idempotent — re-running it against a project that already exists updates
+settings and env and redeploys, so it is also the tool for "change the database
+string on all five".
+
+**The token needs the team in scope, and you cannot tell from looking at it.**
+The token that ships in the build environment can read and deploy
+offer-decoder and nothing else — project creation returns `403 You don't have
+permission to create the project`. A second token from the same account, with
+the same `vcp_` prefix, creates projects fine. So the prefix tells you nothing;
+only the call does. Mint one at https://vercel.com/account/settings/tokens with
+its scope set to the owning team. If a token is refused, `pnpm provision` says
+so on the first attempt and names the fix, and the fallback is always to create
+the projects by hand through the dashboard (route **a**) and then run
+`pnpm provision --verify-only`.
+
+**`DATABASE_URL` cannot be copied off the offer-decoder project.** It was
+written there as a `sensitive` variable, and Vercel never returns the value of
+one of those — not to the dashboard, not to `vercel env pull`, not to the API,
+which answers `"decrypted": false` and an empty string. Paste it again from the
+Supabase connection-string page. `pnpm provision` writes it as `encrypted`
+instead, which is Vercel's default and still encrypted at rest, so the next
+person can read it back rather than hitting this same wall.
+
 ### Two things that may bite on the Hobby plan
 
 **Region.** Each `vercel.json` pins a region — Mumbai (`bom1`) for the three
@@ -180,15 +236,94 @@ decoded end to end, six tables created on first request. `/api/health` reports
 `"database": true`, but note that only means `DATABASE_URL` is set and non-empty;
 it never opens a connection. Doing one real decode is what proves the string.
 
+It was redeployed from `main` through `pnpm provision` to prove that path
+works: build READY, `/api/health` still `"database": true`, homepage 200. Worth
+knowing from that run — the `bom1` region in `vercel.json` was accepted, so the
+Hobby-plan region warning above did not bite.
+
+**All five are now deployed, and `pnpm provision` is what did it.** Each was
+created from the API, given the root directory and the outside-files flag, sent
+the shared `DATABASE_URL`, deployed from `main`, and then checked by running a
+real job through it rather than by reading a health flag.
+
+Two things that run learned, both now fixed in the script:
+
+- `/v13/deployments` rejects `owner/name` in `gitSource` and wants the numeric
+  `repoId`.
+- Vercel will not convert an environment variable between types in place. A
+  variable created `sensitive` returns 400 on any PATCH that says `encrypted`;
+  it has to be deleted and recreated. offer-decoder's `DATABASE_URL` was
+  converted that way, so all five now hold it as `encrypted` and none of them
+  strand the next person the way the original did.
+
 **Record the URLs here when you have them:**
 
-| App | Production URL |
-| --- | --- |
-| offer-decoder | https://redesigned-system-offer-decoder.vercel.app |
-| ledger | |
-| uptime | |
-| freelancer-kit | |
-| admin | |
+| App | Production URL | Verified with |
+| --- | --- | --- |
+| offer-decoder | https://redesigned-system-offer-decoder.vercel.app | a real offer letter decoded |
+| ledger | https://redesigned-system-ledger.vercel.app | `fixtures/statement-hdfc.csv` parsed and categorised |
+| uptime | https://redesigned-system-uptime.vercel.app | github.com and vercel.com checked live |
+| freelancer-kit | https://redesigned-system-freelancer-kit.vercel.app | an inter-state IGST invoice generated |
+| admin | https://redesigned-system-admin.vercel.app | signed in, `Postgres`, all four probes' runs visible |
+
+---
+
+## 3a. The admin dashboard hung, and what it turned out to be
+
+Worth reading before you touch the store, because almost every plausible
+explanation here was wrong and the evidence is cheap to re-gather.
+
+**Symptom.** The dashboard returned in under a second on the first request
+after a deploy and then hung on every request after it, until the platform's
+300-second function limit. The four probes and the admin app's own API routes
+stayed fast throughout, which is what made it look like a database problem it
+was not: on Vercel every route is a separate process with its own connection
+pool, so "one route wedges and the rest are fine" is the normal shape of a
+per-process fault, not evidence about the database.
+
+**Cause.** `loadDashboard` read its four figures with `Promise.all` — four
+concurrent demands on a pool of three, in front of a shared pooler. The same
+four calls made one after another return in about 25 milliseconds together.
+Sequential is now what it does, and the page has run 15 consecutive times at
+about half a second.
+
+**What found it.** Nothing external could see the error: the 500 page hides
+it and runtime logs need a token this session did not have. A temporary
+endpoint that timed each store call separately and returned the real message
+turned "the page hangs" into "`getProbeStates` is cancelled with 57014 in 48
+milliseconds", and everything followed from that. The endpoint has been
+removed — it reported internal error text to anyone with the admin cookie —
+but it is four lines to write again, and it is the tool to reach for.
+
+**Two of the fixes attempted along the way were wrong, and both are worth
+knowing about:**
+
+- A `statement_timeout` set as a bare number of milliseconds, which is how
+  postgres.js types it, was applied as something far smaller and cancelled
+  every statement within tens of milliseconds. Spelling it `"60s"` behaved and
+  also failed the type check. There is now no server-side statement timeout; a
+  client-side deadline in `guard` bounds the wait instead, in one place and in
+  units nothing reinterprets.
+- Replacing the connection pool whenever a call missed its deadline read
+  sensibly and made things strictly worse: the pool is shared, so tearing it
+  down under the other three in-flight reads turned one slow query into four
+  failed ones. The deadline now only bounds the wait and repairs nothing.
+
+**What survives from it.** Every store call has a ten-second client-side
+deadline, so the failure mode is an error page in ten seconds rather than a
+spinner for three hundred. The migration is sent with `.simple()`, which is
+required for a multi-statement script and matters more behind a transaction
+pooler, and a failed migration no longer caches itself as a promise that never
+settles — which is what made the failure total and identical rather than
+intermittent, and why a redeploy appeared to fix it every time.
+
+**One piece of drift to clear.** Iterating on this exhausted Vercel's free
+limit of 100 API-created deployments per day, so `ledger`, `uptime` and
+`freelancer-kit` are still running the build from before the last two store
+commits. All three were re-tested afterwards and are healthy — the fault was
+only ever in the dashboard's parallel reads — but they are behind. One
+`pnpm provision` once the quota resets aligns them, and a merge to `main`
+would do it through the Git integration instead, which is a separate quota.
 
 ---
 
@@ -243,6 +378,11 @@ Suggested names, all currently placeholders in the code:
 Buy at any registrar, add to the Vercel project, follow Vercel's DNS
 instructions. Then set `APP_BASE_URL` per project.
 
+`APP_BASE_URL` is already set on all five, to their `*.vercel.app` addresses,
+so the links inside emails and status pages are absolute today rather than
+relative and useless. Repoint it the day a real domain lands:
+`APP_BASE_URL=https://offerdecoder.in pnpm provision --apps=offer-decoder`.
+
 **Do not skip the email addresses.** They are in every footer, every FAQ, and
 in the support widget's "I don't know, email us" fallback. An unread address
 there is the one dishonest thing in an otherwise honest product.
@@ -293,6 +433,13 @@ monitor set, which is what makes a status page you sent a client stay current.
 openssl rand -base64 24
 ```
 
+**Done.** A secret was generated and set on `redesigned-system-uptime` and
+`redesigned-system-freelancer-kit` — the same value on both, which is what
+item 11 needs. It was handed over in the session that set it rather than
+written down here. Verified live: `/api/cron/check` returns 401 with no
+header and 200 with it, and the authorised call refreshed 7 monitor sets;
+`/api/cron/reminders` behaves the same way.
+
 Without it `/api/cron/check` refuses every request, including Vercel's own —
 deliberately, because that endpoint makes outbound requests to arbitrary
 third-party domains and an open version of it is a request amplifier pointed at
@@ -336,29 +483,63 @@ once, not for your situation" — more useful, and still true.
 
 ---
 
-## 9. Two claims I could not verify from this machine
+## 9. Two claims that could not be verified from the build machine — both now checked, one was broken
 
-Both are in the code and both are tested against recorded or local data. Neither
-could be confirmed against the live internet, because outbound requests from the
-build environment go through a filtering proxy that returns 403 for most hosts
-and terminates TLS with its own certificate.
+Both were tested against recorded or local data and neither could be confirmed
+against the live internet from the build environment, whose outbound requests
+go through a filtering proxy that returns 403 for most hosts and terminates TLS
+with its own certificate. **Both have now been run from the deployed app.** TLS
+was fine. RDAP was not, and is fixed.
 
-**a. RDAP domain expiry (`apps/uptime`).** `https://rdap.org` returned 403 from
-here. The parsing is tested against realistic RDAP payloads, and the failure
-path (registry does not publish expiry → report "unknown") is tested. But
-**before you post the uptime launch content, run one live check against a real
-domain and confirm a real expiry date comes back.** The launch post claims this
-works. If it does not, the fix is likely a different RDAP base — set
-`RDAP_BASE_URL` to a registry endpoint directly.
+**a. RDAP domain expiry (`apps/uptime`) — was broken, now fixed and working.**
 
-**b. Live TLS against real hosts.** Certificate reading is tested against local
-HTTPS servers with three generated certificates (valid, near-expiry,
-wrong-hostname), and a raw handshake to a real host worked from a plain node
-process. Inside the app the proxy substituted its own certificate, so the
-end-to-end path against the public internet is unproven. Run one check against
-a domain whose expiry date you know.
+The claim was true of the parsing and false of everything around it.
+`rdap.org`, the redirector the code used, returns 403 to requests from Vercel,
+so every lookup in production failed. The earlier session blamed the build
+sandbox's filtering proxy; that was the wrong conclusion — it reproduced in
+production, and pointing the same app at an authoritative registry returned a
+real registrar and expiry immediately.
 
-Neither is a suspected bug. Both are unverified, and I would rather say so.
+`checkDomain` now reads IANA's own registry (`data.iana.org/rdap/dns.json`),
+which maps every TLD to the RDAP server that owns it, caches it for a day, and
+queries that server directly. Verified against the deployed app:
+
+| Domain | Result |
+| --- | --- |
+| github.com | expiry 2026-10-09, MarkMonitor |
+| zerodha.com | expiry 2033-02-17, Cloudflare |
+| amazon.in | expiry 2027-02-11, MarkMonitor |
+| irctc.co.in | expiry 2027-06-04, GoDaddy |
+
+**Two things that came out of fixing it.** First, `.in` was never the problem.
+It answers in full, `.co.in` included, so the FAQ and the launch content that
+named it as a registry publishing "thin records or none" were saying something
+untrue to customers, and have been corrected.
+
+Second, `irctc.co.in` is there because it exercises a separate bug the fix
+uncovered: the registrable domain was always the last two labels, so
+`status.acme.co.in` was looked up as `co.in` — a question about the registry
+rather than about the customer's domain, on exactly the TLD shape this
+probe's audience uses. There is now a small second-level-suffix table for the
+three-label cases. It is not the public suffix list and does not pretend to be;
+a suffix missing from it degrades to "unknown", never to a wrong date.
+
+`RDAP_BASE_URL` still overrides the lookup, and its doc comment now carries the
+warning that cost an experiment to learn: one base serves one registry, so
+pinning it to a `.com` server makes every `.in` domain report as possibly
+unregistered. It is for tests and single-TLD deployments, not a fix.
+
+**The uptime launch post can now claim domain-expiry monitoring.** It could
+not before.
+
+**b. Live TLS against real hosts — confirmed working.** A check from the
+deployed app against `github.com` returned the real certificate: issuer Sectigo
+Limited, subject `github.com`, `hostnameMatches: true`, alt names
+`github.com`/`www.github.com`, valid to 2026-11-29, 86 days remaining. Nothing
+was substituted and nothing was guessed. This claim is safe to make publicly.
+
+Neither is unverified any more. One was a real bug in production that no test
+could have caught, because the thing that was broken was which host got asked.
 
 ---
 
@@ -396,8 +577,14 @@ Actions:
 | Secret | Value |
 | --- | --- |
 | `CRON_SECRET` | the same value you set in the Vercel projects |
-| `UPTIME_URL` | the deployed uptime app, e.g. `https://uptime.vercel.app` |
-| `FREELANCER_URL` | the deployed freelancer app |
+| `UPTIME_URL` | `https://redesigned-system-uptime.vercel.app` |
+| `FREELANCER_URL` | `https://redesigned-system-freelancer-kit.vercel.app` |
+
+Two of those three are settled: the URLs are filled in above, and `CRON_SECRET`
+is the value already set on both Vercel projects and handed over with it — the
+GitHub secret has to be the same string. Adding repository secrets needs admin
+access this session did not have, so those three entries are the one part of
+this item still waiting on you.
 
 Then run it once by hand (Actions → Scheduled checks → Run workflow) to confirm
 a 200 before trusting the schedule. The endpoints are idempotent and both are
