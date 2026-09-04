@@ -45,7 +45,8 @@ export const config: ProbeConfig = {
       interval: "month",
       description: "For anyone doing this every month instead of every March.",
       highlight: true,
-      features: ["Unlimited statements", "Excel export", "Category rules you can override", "Cancel any month"],
+      features: ["Unlimited statements", "Excel export", "Cancel any month"],
+      planned: ["Category rules you can override and save"],
     },
     {
       id: "yearly",
@@ -54,7 +55,8 @@ export const config: ProbeConfig = {
       currency: "INR",
       interval: "year",
       description: "Two months free against the monthly price.",
-      features: ["Everything in Monthly", "Full financial-year rollup", "Priority on parser fixes for your bank"],
+      features: ["Everything in Monthly", "Priority on parser fixes for your bank"],
+      planned: ["Full financial-year rollup across statements"],
     },
   ],
 

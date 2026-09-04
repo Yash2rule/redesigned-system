@@ -15,7 +15,7 @@ Before anything else, prove it runs on your machine:
 ```bash
 pnpm install
 pnpm build          # 5 apps, ~60s cold
-pnpm test           # 229 tests, ~3s
+pnpm test           # 268 tests, ~3s
 cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
 ```
 
@@ -333,6 +333,15 @@ plan promises *hourly*, which Vercel Hobby cannot do: it allows one cron per
 day. Either move that project to Pro, or point an external pinger (a GitHub
 Actions schedule works and is free) at `/api/cron/check` with the same bearer
 token. Until then, do not describe hourly checks as available.
+
+**Every paid plan now separates what works from what does not.** An audit
+found six features listed on pricing pages that existed only in the copy —
+saved client details, emailed reports, category overrides, a financial-year
+rollup, and so on. One of them, the side-by-side offer comparison, was worth
+building and is built. The rest moved into a `planned` list that the pricing
+block renders under "Not built yet", and `tests/pricing-claims.test.ts` fails
+the build if an unbuilt capability is ever listed as working again. When you
+build one of them, move the string from `planned` to `features`.
 
 **Probe 2 (LLM prompt regression testing) was not built.** I swapped it for
 probe 7; the reasoning is in `DECISIONS.md` §3. Short version: without a model

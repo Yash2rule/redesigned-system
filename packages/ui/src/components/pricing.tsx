@@ -111,7 +111,7 @@ export function PricingBlock({
               </div>
               <p className="mt-3 text-3xl font-bold tracking-tight">{priceLabel(plan)}</p>
               <p className="mt-2 text-sm text-[var(--muted)]">{plan.description}</p>
-              <ul className="mt-4 flex-1 space-y-2 text-sm">
+              <ul className="mt-4 space-y-2 text-sm">
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex gap-2">
                     <span aria-hidden className="text-[var(--accent)]">
@@ -121,6 +121,31 @@ export function PricingBlock({
                   </li>
                 ))}
               </ul>
+
+              {/*
+                Planned features are shown, but never as if they exist. A
+                visitor deciding whether this is worth money is entitled to
+                know which half they would be waiting for.
+              */}
+              {(plan.planned?.length ?? 0) > 0 ? (
+                <div className="mt-4 flex-1 border-t border-dashed border-[var(--line)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    Not built yet
+                  </p>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    {plan.planned?.map((feature) => (
+                      <li key={feature} className="flex gap-2">
+                        <span aria-hidden className="text-[var(--muted)]">
+                          ○
+                        </span>
+                        <span className="text-[var(--muted)]">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="flex-1" />
+              )}
               <button
                 type="button"
                 onClick={() => choose(plan)}

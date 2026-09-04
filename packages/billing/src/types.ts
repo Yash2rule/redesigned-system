@@ -9,8 +9,18 @@ export type Plan = {
   currency: Currency;
   interval: "one_time" | "month" | "year";
   description: string;
-  /** Sold as a bullet list on the pricing block. */
+  /** Things this plan gives you that work today. */
   features: string[];
+  /**
+   * Things this plan will give you that are NOT built yet.
+   *
+   * Rendered separately and labelled, never mixed in with `features`. A
+   * pricing page that lists a feature the product does not have is the same
+   * lie as a buy button that does not charge — and it poisons the same signal,
+   * because you cannot tell whether someone clicked for what exists or for
+   * what was promised.
+   */
+  planned?: string[];
   highlight?: boolean;
   /** Razorpay Payment Link / Plan id, or Lemon Squeezy variant id. */
   providerRef?: string;

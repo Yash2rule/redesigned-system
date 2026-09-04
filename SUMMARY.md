@@ -1,7 +1,7 @@
 # SUMMARY.md
 
 1. **Four paid probes are built end to end and work with an empty environment.**
-   Offer Decoder (Indian CTC → real in-hand + clause red flags), Statement to
+   Offer Decoder (Indian CTC → real in-hand, clause red flags, side-by-side comparison), Statement to
    Ledger (bank/UPI CSV → categorised ledger + Excel), Client Watch (uptime +
    SSL + domain expiry, white-label status page that re-checks daily, USD), Freelance Desk (GST invoice +
    contract + advance-tax schedule).
@@ -18,7 +18,7 @@
    visitors per event, with a persisted kill/keep toggle. It ranks on
    result-to-email, and says on the page why: `paid` reads zero everywhere
    until a rail exists, so it cannot rank anything.
-6. **229 tests pass and all five apps build.** Verified in Chromium at 390px and
+6. **268 tests pass and all five apps build.** Verified in Chromium at 390px and
    1280px: zero console errors, no horizontal overflow, forms validate, and
    both document probes produce real results through the actual UI.
 7. **Bugs found by running it rather than by reading it**, all fixed: a missing

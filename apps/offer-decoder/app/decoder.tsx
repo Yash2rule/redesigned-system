@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatIndianShort, formatInr } from "@probes/core/money.ts";
 import {
   AssumptionsPanel,
@@ -13,6 +13,7 @@ import {
 } from "@probes/ui";
 import type { DecodeResult } from "../lib/analyse.ts";
 import { DISPLAY_ORDER } from "../lib/salary.ts";
+import { readSavedOffers, saveOffer } from "../lib/saved.ts";
 
 const STATES: { code: string; label: string }[] = [
   { code: "OTHER", label: "Not sure / other state" },
@@ -56,16 +57,33 @@ export function Decoder() {
   const [state, setState] = useState("OTHER");
   const [pfBasis, setPfBasis] = useState("full-basic");
   const [payoutRatio, setPayoutRatio] = useState("0.7");
+  const [savedCount, setSavedCount] = useState(0);
+
+  // localStorage is only available after mount.
+  useEffect(() => setSavedCount(readSavedOffers().length), []);
 
   function handleResult(payload: unknown) {
     const typed = payload as { id?: string; result?: DecodeResult };
-    if (typed.result) {
-      setResult(typed.result);
-      setArtifactId(typed.id ?? null);
-      requestAnimationFrame(() =>
-        document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" }),
-      );
+    if (!typed.result) return;
+
+    setResult(typed.result);
+    setArtifactId(typed.id ?? null);
+
+    // Remember it locally so it can be compared against the next one. Only the
+    // id and a label are stored; the result itself stays on the server.
+    if (typed.id) {
+      const salary = typed.result.salary;
+      saveOffer({
+        id: typed.id,
+        label: `${formatIndianShort(salary.ctc)} CTC · ${formatInr(salary.monthlyInHand)}/mo in hand`,
+        decodedAt: new Date().toISOString(),
+      });
+      setSavedCount(readSavedOffers().length);
     }
+
+    requestAnimationFrame(() =>
+      document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
   }
 
   return (
@@ -136,12 +154,22 @@ export function Decoder() {
         helpText="PDFs with selectable text work. Scans and photos don't — we don't run OCR, and we won't guess at your numbers. Nothing is shared with your employer."
       />
 
-      {result ? <Result result={result} artifactId={artifactId} /> : null}
+      {result ? (
+        <Result result={result} artifactId={artifactId} savedCount={savedCount} />
+      ) : null}
     </div>
   );
 }
 
-function Result({ result, artifactId }: { result: DecodeResult; artifactId: string | null }) {
+function Result({
+  result,
+  artifactId,
+  savedCount,
+}: {
+  result: DecodeResult;
+  artifactId: string | null;
+  savedCount: number;
+}) {
   const { salary } = result;
   const componentByKey = new Map(result.components.map((c) => [c.key, c]));
   const payoutPct = Math.round(
@@ -369,6 +397,22 @@ function Result({ result, artifactId }: { result: DecodeResult; artifactId: stri
             Free, no email needed. Includes every assumption above so a CA can check it.
           </p>
         </div>
+      ) : null}
+
+      {savedCount >= 2 ? (
+        <div className="mt-6">
+          <a
+            href="/compare"
+            className="inline-flex rounded-lg border border-[var(--line)] px-5 py-3 text-sm font-semibold"
+          >
+            Compare this against your other {savedCount - 1} offer
+            {savedCount - 1 === 1 ? "" : "s"}
+          </a>
+        </div>
+      ) : savedCount === 1 ? (
+        <p className="mt-6 text-[13px] text-[var(--muted)]">
+          Decode a second offer and you can put them side by side.
+        </p>
       ) : null}
     </div>
   );

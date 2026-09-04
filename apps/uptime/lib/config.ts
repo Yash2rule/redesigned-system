@@ -35,12 +35,8 @@ export const config: ProbeConfig = {
       currency: "USD",
       interval: "month",
       description: "For a small agency with a handful of retainer clients.",
-      features: [
-        "Up to 25 monitors",
-        "Branded status page on our domain",
-        "Weekly email report",
-        "Email alert when something changes",
-      ],
+      features: ["Up to 25 monitors", "Branded status page on our domain"],
+      planned: ["Weekly email report", "Email alert when something changes"],
     },
     {
       id: "agency",
@@ -52,10 +48,13 @@ export const config: ProbeConfig = {
       highlight: true,
       features: [
         "Up to 150 monitors",
-        "Your logo and your own domain on the status page",
         "Per-client status pages",
+        "Client-ready PDF report, on demand",
+      ],
+      planned: [
+        "Your logo and your own domain on the status page",
         "Hourly re-checks instead of daily",
-        "Weekly PDF report per client",
+        "The weekly report emailed out for you",
       ],
     },
   ],

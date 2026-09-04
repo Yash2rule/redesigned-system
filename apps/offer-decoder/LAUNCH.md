@@ -35,7 +35,11 @@ your own letter.
 | --- | --- | --- |
 | First offer | Free | The complete report, including the PDF. Not a preview. |
 | One offer | ₹199 | One further report. |
-| Compare five | ₹499 | Five reports plus the side-by-side view, 90 days. |
+| Compare five | ₹499 | Five reports plus the side-by-side comparison, 90 days. |
+
+Every offer you decode is remembered in your browser, so comparing two is one
+click. Nothing is sent anywhere extra and it does not follow you to another
+device — the page says so.
 
 **Disclaimer (appears in the footer and on every PDF)**
 Offer Decoder provides drafting and explanation assistance, not tax, legal or
@@ -83,6 +87,10 @@ r/developersIndia expects you to be present in the comments).
 >
 > First offer is free and complete, PDF included. I'm not taking payments yet
 > — the button says so and just records an email.
+>
+> If you're choosing between offers, it puts them side by side and says which
+> one wins on what — including the case where an offer only wins if its
+> variable actually pays out, which is the comparison people get wrong.
 >
 > Two things I'd genuinely like feedback on:
 > 1. If the in-hand number is off for your offer, tell me the structure and

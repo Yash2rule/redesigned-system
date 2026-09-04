@@ -52,9 +52,9 @@ export const config: ProbeConfig = {
       highlight: true,
       features: [
         "Everything in One offer, five times",
-        "Side-by-side comparison view",
+        "Side-by-side comparison, with the trade-offs called out",
+        "The questions to put to HR, per offer",
         "Valid for 90 days",
-        "Includes the counter-offer question list",
       ],
     },
   ],

@@ -71,7 +71,11 @@ export function DataTable({
   align?: ("left" | "right")[];
 }) {
   return (
-    <div className="-mx-1 overflow-x-auto">
+    // `relative` is load-bearing: absolutely positioned descendants (Tailwind's
+    // `sr-only` is `position: absolute`) are only clipped by an overflow
+    // ancestor that is also their containing block. Without it they escape the
+    // scroll container and drag the whole page sideways on mobile.
+    <div className="relative -mx-1 overflow-x-auto">
       <table className="w-full min-w-[32rem] border-collapse text-sm">
         <thead>
           <tr className="border-b border-[var(--line)]">

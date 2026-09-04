@@ -36,11 +36,11 @@ export const config: ProbeConfig = {
       interval: "month",
       description: "Unlimited invoices, contracts and tax estimates.",
       highlight: true,
-      features: [
-        "Unlimited GST invoices with saved client details",
-        "Contract templates with your defaults",
+      features: ["Unlimited GST invoices", "Unlimited contracts", "Everything as PDF"],
+      planned: [
+        "Saved client details, so you type them once",
+        "Contract templates that remember your defaults",
         "Advance-tax reminders before each due date",
-        "Everything as PDF",
       ],
     },
     {
@@ -50,8 +50,8 @@ export const config: ProbeConfig = {
       currency: "INR",
       interval: "year",
       description: "Two months free against the monthly price.",
-      features: [
-        "Everything in Monthly",
+      features: ["Everything in Monthly"],
+      planned: [
         "Financial-year invoice register for your CA",
         "Year-end receipts summary",
       ],
