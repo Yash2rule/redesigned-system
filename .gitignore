@@ -17,3 +17,9 @@ tmp/
 # test time by tests/certs.ts.
 *.pem
 *.key
+
+# `next dev` writes these into whichever app you happen to run. Tracking them
+# would mean one app carries them and four do not, depending on who ran what.
+# They regenerate on demand, so they are not worth a diff.
+apps/*/AGENTS.md
+apps/*/CLAUDE.md
