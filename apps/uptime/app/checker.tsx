@@ -21,6 +21,8 @@ export function Checker() {
   const [targets, setTargets] = useState("");
   const [brandName, setBrandName] = useState("");
   const [brandColor, setBrandColor] = useState("#7c3aed");
+  const [alertEmail, setAlertEmail] = useState("");
+  const [alerts, setAlerts] = useState<{ address: string; live: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<BrandedResult | null>(null);
@@ -40,12 +42,13 @@ export function Checker() {
       const response = await fetch("/api/check", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ targets, brandName, brandColor }),
+        body: JSON.stringify({ targets, brandName, brandColor, alertEmail }),
       });
       const payload = (await response.json()) as {
         id?: string;
         result?: BrandedResult;
         error?: string;
+        alerts?: { address: string; live: boolean } | null;
       };
       if (!response.ok || payload.error || !payload.result) {
         setError(payload.error ?? `Something went wrong (${response.status}).`);
@@ -53,6 +56,7 @@ export function Checker() {
       }
       setResult(payload.result);
       setId(payload.id ?? null);
+      setAlerts(payload.alerts ?? null);
       trackClient("result_viewed", { monitors: payload.result.summary.total });
       requestAnimationFrame(() =>
         document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" }),
@@ -110,6 +114,23 @@ export function Checker() {
           </label>
         </div>
 
+        <label className="mt-4 block text-sm">
+          <span className="mb-1.5 block font-medium">
+            Email me when something changes (optional)
+          </span>
+          <input
+            type="email"
+            value={alertEmail}
+            onChange={(e) => setAlertEmail(e.target.value)}
+            placeholder="you@youragency.com"
+            className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2.5 text-sm sm:max-w-sm"
+          />
+          <span className="mt-1 block text-[12px] text-[var(--muted)]">
+            Only when the situation changes — a site breaking, a certificate falling under 30 days,
+            or something recovering. A site that stays down does not get a daily reminder.
+          </span>
+        </label>
+
         {error ? (
           <p role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
             {error}
@@ -131,12 +152,20 @@ export function Checker() {
         ) : null}
       </form>
 
-      {result ? <Result result={result} id={id} /> : null}
+      {result ? <Result result={result} id={id} alerts={alerts} /> : null}
     </div>
   );
 }
 
-function Result({ result, id }: { result: BrandedResult; id: string | null }) {
+function Result({
+  result,
+  id,
+  alerts,
+}: {
+  result: BrandedResult;
+  id: string | null;
+  alerts: { address: string; live: boolean } | null;
+}) {
   return (
     <div id="result" className="mt-10 scroll-mt-6">
       <StatGrid
@@ -264,6 +293,25 @@ function Result({ result, id }: { result: BrandedResult; id: string | null }) {
           </a>
         </div>
       ) : null}
+      {alerts ? (
+        <div className="mt-4">
+          <Note>
+            {alerts.live ? (
+              <>
+                Change alerts will go to <strong>{alerts.address}</strong> — only when something
+                actually changes.
+              </>
+            ) : (
+              <>
+                We saved <strong>{alerts.address}</strong> for change alerts, but email is not
+                switched on for this deployment yet, so nothing will be sent. We would rather tell
+                you that than let you assume you are covered.
+              </>
+            )}
+          </Note>
+        </div>
+      ) : null}
+
       {id ? (
         <div className="mt-3">
           <Note>

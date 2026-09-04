@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getStore, isUserFacingError, recordCorpus } from "@probes/core/server";
 import type { Json } from "@probes/core";
 import { ensureSession, track } from "@probes/analytics";
+import { emailConfigured } from "@probes/email";
 import {
   checkRateLimit,
   rateLimitKey,
@@ -48,7 +49,12 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  let body: { targets?: unknown; brandName?: unknown; brandColor?: unknown };
+  let body: {
+    targets?: unknown;
+    brandName?: unknown;
+    brandColor?: unknown;
+    alertEmail?: unknown;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -80,13 +86,25 @@ export async function POST(request: Request): Promise<Response> {
       : "#7c3aed",
   };
 
+  // One address, validated. Change alerts go here when the daily re-check
+  // finds something different.
+  const alertEmail =
+    typeof body.alertEmail === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(body.alertEmail.trim())
+      ? body.alertEmail.trim().toLowerCase()
+      : null;
+
   const id = randomUUID();
   try {
     await getStore().saveArtifact({
       id,
       probe: "uptime",
       sessionId,
-      payload: { ...result, brand, history: [] } as unknown as Json,
+      payload: {
+        ...result,
+        brand,
+        history: [],
+        alertEmails: alertEmail ? [alertEmail] : [],
+      } as unknown as Json,
       createdAt: new Date().toISOString(),
     });
   } catch (error) {
@@ -112,5 +130,11 @@ export async function POST(request: Request): Promise<Response> {
     },
   });
 
-  return json({ id, result: { ...result, brand } });
+  return json({
+    id,
+    result: { ...result, brand },
+    alerts: alertEmail
+      ? { address: alertEmail, live: emailConfigured() }
+      : null,
+  });
 }

@@ -5,6 +5,7 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { checkHttp, checkTls, parseRdap } from "./checks.ts";
+import type { Severity } from "./monitor.ts";
 import { isPublicAddress } from "./safe-url.ts";
 import { parseTargets, runMonitor } from "./monitor.ts";
 import { useTempStore } from "../../../tests/helpers.ts";
@@ -527,5 +528,79 @@ describe("rate limiting the check endpoint", () => {
     expect(blocked.headers.get("retry-after")).toBeTruthy();
     expect(((await blocked.json()) as { error: string }).error).toContain("checks in the last hour");
     resetRateLimits();
+  });
+});
+
+describe("change alerts", () => {
+  const monitorSet = (worst: Record<string, string>) => ({
+    checkedAt: new Date().toISOString(),
+    monitors: Object.entries(worst).map(([hostname, w]) => ({
+      hostname,
+      worst: w as Severity,
+      findings: [] as { id: string; severity: Severity; title: string; detail: string; action: string }[],
+    })),
+    summary: { total: 1, critical: 0, warning: 0, healthy: 1 },
+    limitations: [] as string[],
+  });
+
+  it("says nothing when nothing changed", async () => {
+    const { diffChecks } = await import("./notify.ts");
+    const same = monitorSet({ "a.com": "ok", "b.com": "critical" });
+    expect(diffChecks(same as never, same as never)).toHaveLength(0);
+  });
+
+  it("reports a site that broke and one that recovered", async () => {
+    const { diffChecks } = await import("./notify.ts");
+    const changes = diffChecks(
+      monitorSet({ "a.com": "ok", "b.com": "critical" }) as never,
+      monitorSet({ "a.com": "critical", "b.com": "ok" }) as never,
+    );
+    expect(changes).toHaveLength(2);
+    expect(changes.find((c) => c.hostname === "a.com")?.direction).toBe("broke");
+    expect(changes.find((c) => c.hostname === "b.com")?.direction).toBe("recovered");
+  });
+
+  it("does not treat a newly added site as a change", async () => {
+    const { diffChecks } = await import("./notify.ts");
+    const changes = diffChecks(
+      monitorSet({ "a.com": "ok" }) as never,
+      monitorSet({ "a.com": "ok", "new.com": "critical" }) as never,
+    );
+    expect(changes).toHaveLength(0);
+  });
+
+  it("stays silent when a set has no alert address", async () => {
+    const { notifyChanges } = await import("./notify.ts");
+    const outcome = await notifyChanges(
+      { ...monitorSet({ "a.com": "critical" }), alertEmails: [] } as never,
+      [{ hostname: "a.com", from: "ok", to: "critical", direction: "broke", summary: "Down" }],
+      "https://example.com/s/x",
+    );
+    expect(outcome.sent).toBe(0);
+    expect(outcome.skipped).toContain("no alert address");
+  });
+
+  it("writes a subject that names what is wrong", async () => {
+    const { changeAlertEmail } = await import("./notify.ts");
+    const one = changeAlertEmail(
+      [{ hostname: "acme.com", from: "ok", to: "critical", direction: "broke", summary: "Not responding" }],
+      "Northline Studio",
+      "https://example.com/s/x",
+    );
+    expect(one.subject).toBe("acme.com needs attention");
+    expect(one.text).toContain("Not responding");
+    expect(one.text).toContain("Northline Studio");
+    // The promise that stops people filtering it.
+    expect(one.text).toContain("does not get a daily reminder");
+  });
+
+  it("writes a recovery subject when everything improved", async () => {
+    const { changeAlertEmail } = await import("./notify.ts");
+    const result = changeAlertEmail(
+      [{ hostname: "acme.com", from: "critical", to: "ok", direction: "recovered", summary: "Back to normal" }],
+      "Northline Studio",
+      "https://example.com/s/x",
+    );
+    expect(result.subject).toContain("back to normal");
   });
 });

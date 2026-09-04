@@ -20,6 +20,9 @@ importers:
       '@probes/core':
         specifier: workspace:*
         version: link:packages/core
+      '@probes/email':
+        specifier: workspace:*
+        version: link:packages/email
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.1
@@ -56,6 +59,9 @@ importers:
       '@probes/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@probes/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@probes/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -93,6 +99,9 @@ importers:
       '@probes/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@probes/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@probes/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -204,6 +213,9 @@ importers:
       '@probes/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@probes/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@probes/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -296,6 +308,12 @@ importers:
       '@types/pdfkit':
         specifier: ^0.17.4
         version: 0.17.6
+
+  packages/email:
+    dependencies:
+      '@probes/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/ui:
     dependencies:

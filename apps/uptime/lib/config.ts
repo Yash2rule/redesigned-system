@@ -35,8 +35,12 @@ export const config: ProbeConfig = {
       currency: "USD",
       interval: "month",
       description: "For a small agency with a handful of retainer clients.",
-      features: ["Up to 25 monitors", "Branded status page on our domain"],
-      planned: ["Weekly email report", "Email alert when something changes"],
+      features: [
+        "Up to 25 monitors",
+        "Branded status page on our domain",
+        "Email alert when something changes — and only then",
+      ],
+      planned: ["Weekly summary email"],
     },
     {
       id: "agency",
@@ -54,7 +58,7 @@ export const config: ProbeConfig = {
       planned: [
         "Your logo and your own domain on the status page",
         "Hourly re-checks instead of daily",
-        "The weekly report emailed out for you",
+        "The weekly summary emailed to each client",
       ],
     },
   ],
@@ -77,6 +81,12 @@ export const config: ProbeConfig = {
       answer:
         "We use RDAP, the free public registry protocol that replaced WHOIS. Most generic domains publish an expiry date through it. Several country registries — .in is the one Indian agencies hit most — publish thin records or none at all. When that happens we say unknown rather than guessing a date.",
       keywords: ["rdap", "whois", "expiry", "unknown", ".in", "domain", "registry"],
+    },
+    {
+      question: "Will it email me every day about a site that is still down?",
+      answer:
+        "No. Alerts fire only when the situation changes — a site breaking, a certificate crossing a threshold, or something recovering. A site that stays down does not generate a second message. A monitor that cries wolf every morning gets filtered, and then the one that matters gets filtered too.",
+      keywords: ["email", "alert", "notification", "spam", "daily", "noise", "notify"],
     },
     {
       question: "How often are the checks run?",

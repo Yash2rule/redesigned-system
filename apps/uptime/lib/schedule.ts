@@ -2,6 +2,7 @@ import { getStore } from "@probes/core/server";
 import type { Json } from "@probes/core";
 import { runChecks } from "./monitor.ts";
 import type { CheckRunResult, Severity } from "./monitor.ts";
+import { diffChecks, notifyChanges } from "./notify.ts";
 
 /**
  * Scheduled re-checks.
@@ -24,6 +25,8 @@ export type MonitorSet = CheckRunResult & {
   brand?: { name: string; color: string };
   /** Newest first, capped. */
   history?: HistoryEntry[];
+  /** Where to send change alerts. Empty means the owner did not ask for any. */
+  alertEmails?: string[];
 };
 
 /** Roughly a fortnight of daily checks — enough to see a trend, small to store. */
@@ -53,6 +56,10 @@ export type ScheduleReport = {
   considered: number;
   refreshed: number;
   skippedStale: number;
+  /** Change alerts actually delivered this run. */
+  alertsSent: number;
+  /** Sets where something changed but no alert could be sent, and why. */
+  alertsSkipped: string[];
   failed: { id: string; error: string }[];
   startedAt: string;
   finishedAt: string;
@@ -63,7 +70,10 @@ export type ScheduleReport = {
  * starves. Runs sets sequentially: the point is to be a good citizen toward
  * the domains being checked, not to finish fast.
  */
-export async function runScheduledChecks(now: Date = new Date()): Promise<ScheduleReport> {
+export async function runScheduledChecks(
+  now: Date = new Date(),
+  baseUrl = process.env.APP_BASE_URL?.trim() || "",
+): Promise<ScheduleReport> {
   const startedAt = now.toISOString();
   const store = getStore();
   const artifacts = await store.listArtifacts("uptime", 200);
@@ -73,6 +83,8 @@ export async function runScheduledChecks(now: Date = new Date()): Promise<Schedu
     considered: artifacts.length,
     refreshed: 0,
     skippedStale: 0,
+    alertsSent: 0,
+    alertsSkipped: [],
     failed: [],
     startedAt,
     finishedAt: startedAt,
@@ -105,6 +117,7 @@ export async function runScheduledChecks(now: Date = new Date()): Promise<Schedu
       const merged: MonitorSet = {
         ...next,
         brand: previous.brand,
+        alertEmails: previous.alertEmails,
         history: appendHistory(previous, next),
       };
       await store.saveArtifact({
@@ -115,6 +128,17 @@ export async function runScheduledChecks(now: Date = new Date()): Promise<Schedu
         createdAt: artifact.createdAt,
       });
       report.refreshed += 1;
+
+      // Only mail when the situation actually changed. A monitor that says
+      // "still down" every morning trains people to filter it, and then the
+      // one that matters gets filtered too.
+      const changes = diffChecks(previous, next);
+      if (changes.length > 0) {
+        const statusUrl = `${baseUrl}/s/${artifact.id}`;
+        const outcome = await notifyChanges(merged, changes, statusUrl);
+        report.alertsSent += outcome.sent;
+        if (outcome.skipped) report.alertsSkipped.push(`${artifact.id.slice(0, 8)}: ${outcome.skipped}`);
+      }
     } catch (error) {
       // One bad set must not stop the rest of the schedule.
       report.failed.push({ id: artifact.id, error: (error as Error).message });

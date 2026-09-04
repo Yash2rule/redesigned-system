@@ -15,7 +15,7 @@ Before anything else, prove it runs on your machine:
 ```bash
 pnpm install
 pnpm build          # 5 apps, ~60s cold
-pnpm test           # 301 tests, ~3s
+pnpm test           # 324 tests, ~3s
 cd apps/offer-decoder && pnpm dev     # then open http://localhost:3000
 ```
 
@@ -244,7 +244,15 @@ Events go to your database regardless; PostHog is a mirror, not the source of
 truth. The admin dashboard reads the database. Add it if you want funnels and
 session replay you did not have to build.
 
-**a. `CRON_SECRET` (uptime probe only)** — needed for scheduled re-checks. Set
+**a. `RESEND_API_KEY` + `EMAIL_FROM`** — needed for change alerts on the
+uptime probe, which are built and tested but send nothing without them. When
+someone enters an alert address and email is not configured, the result page
+tells them plainly that nothing will be sent rather than letting them assume
+they are covered. `EMAIL_FROM` must be on a domain verified with Resend, and
+`APP_BASE_URL` should be set too or the status-page link inside the email is
+relative and useless.
+
+**b. `CRON_SECRET` (uptime probe only)** — needed for scheduled re-checks. Set
 it and the daily cron in `apps/uptime/vercel.json` starts refreshing every live
 monitor set, which is what makes a status page you sent a client stay current.
 
@@ -339,7 +347,7 @@ from which product, which is the entire point of running them in parallel.
 
 **Hourly re-checks for the uptime probe.** Daily re-checks are built and
 working (`/api/cron/check`, wired to a daily cron in
-`apps/uptime/vercel.json`, gated on `CRON_SECRET` — see item 7a). The Agency
+`apps/uptime/vercel.json`, gated on `CRON_SECRET` — see item 7b). The Agency
 plan promises *hourly*, which Vercel Hobby cannot do: it allows one cron per
 day. Either move that project to Pro, or point an external pinger (a GitHub
 Actions schedule works and is free) at `/api/cron/check` with the same bearer

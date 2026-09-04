@@ -26,7 +26,8 @@
     "@probes/core": "workspace:*",
     "@probes/app-kit": "workspace:*",
     "@probes/billing": "workspace:*",
-    "@probes/analytics": "workspace:*"
+    "@probes/analytics": "workspace:*",
+    "@probes/email": "workspace:*"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

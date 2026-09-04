@@ -20,8 +20,10 @@ const CONFIGS: ProbeConfig[] = [offerDecoder, ledger, uptime, freelancerKit];
 
 /** Phrases that describe capabilities this codebase does not have. */
 const NOT_BUILT = [
-  /\bemail(ed)?\b.*\b(report|alert|reminder|summary)\b/i,
-  /\b(report|alert|reminder)\b.*\bemail(ed)?\b/i,
+  // Change alerts ARE built (apps/uptime/lib/notify.ts). Emailed reports,
+  // reminders and summaries are not, so those stay flagged.
+  /\bemail(ed)?\b.*\b(report|reminder|summary)\b/i,
+  /\b(report|reminder|summary)\b.*\bemail(ed)?\b/i,
   /\bsaved\b.*\b(client|details|defaults)\b/i,
   /\b(remember|remembers)\b.*\bdefaults?\b/i,
   /\boverride\b.*\bsave\b/i,

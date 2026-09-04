@@ -30,7 +30,7 @@ client the link.
 | Plan | Price | What it is |
 | --- | --- | --- |
 | Manual check | Free | Up to 8 domains, no account, the full check. |
-| Studio | $29/mo | 25 monitors, branded status page, weekly report, change alerts. |
+| Studio | $29/mo | 25 monitors, branded status page, change alerts. |
 | Agency | $79/mo | 150 monitors, your logo and your own domain, per-client pages, hourly re-checks. |
 
 Daily re-checks run for every monitor set, free ones included. The paid tiers
@@ -178,6 +178,10 @@ For agency-owner and freelance-dev communities. Keep it to the pain.
       covered, and there is a test named after it.
 - [ ] r/webdev removes most self-promotion. Check whether they have a
       showcase thread and use it.
+- [ ] **Set `RESEND_API_KEY` and `EMAIL_FROM` before posting**, if you mention
+      alerts. They are built and tested, but without those variables nothing is
+      sent — the UI says so honestly, which is fine for a visitor and
+      embarrassing in a launch post.
 - [ ] **Set `CRON_SECRET` before posting.** Daily re-checks are built and the
       copy above says they happen. Without that variable the cron endpoint
       refuses every request and status pages silently go stale, which would
