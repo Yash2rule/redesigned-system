@@ -7,9 +7,9 @@ committed.
 **Push status: pushed.** The branch is on GitHub — item 0 has the link. No
 pull request has been opened; that is your call.
 
-**Deployment status: one of five.** offer-decoder is live on Supabase and
-verified; the other four are blocked on a Vercel token that can create
-projects, which is the first thing item 3 explains.
+**Deployment status: all five are live, on one Supabase database, verified by
+use rather than by health check.** URLs are in item 3. Items 1, 2 and 3 are
+done; item 9a now has an answer and it is not the one that was expected.
 
 Before anything else, prove it runs on your machine:
 
@@ -97,6 +97,15 @@ themselves on first request — there is no migration step to run.
 
 Verify: open `<any-app>/api/health` and check `"database": true`.
 
+**Done — and note what proved it.** `"database": true` only means the variable
+is set and non-empty; it never opens a connection, so it cannot tell you the
+string is right. What proved it was running one real job through each probe and
+then opening the dashboard: a statement parsed on ledger, a GST invoice on
+freelancer-kit, two domains checked on uptime, an offer letter decoded on
+offer-decoder — and the admin deployment, which shares nothing with those four
+but the connection string, showed the badge `Postgres` and counted every one of
+them. That is the cross-deployment read the whole item exists for.
+
 ---
 
 ## 2. Admin password
@@ -110,6 +119,12 @@ openssl rand -base64 24
 ```
 
 Set it as `ADMIN_PASSWORD` on the `admin` project only. Minimum 8 characters.
+
+**Done.** A 32-character password was generated with the command above and set
+on `redesigned-system-admin`; it was handed over in the session that set it and
+is deliberately not written down here. `/api/health` on that project reports
+`"passwordSet": true`, and the dashboard was opened with it. To replace it:
+`ADMIN_PASSWORD=<new> pnpm provision --apps=admin`.
 
 The dashboard is also where you reach the people who left an email: download
 the list as CSV, or write them a message. That flow is dry-run by default,
@@ -182,14 +197,16 @@ It is idempotent — re-running it against a project that already exists updates
 settings and env and redeploys, so it is also the tool for "change the database
 string on all five".
 
-**The token has to be an account or team token.** The one in the build
-environment starts with `vcp_`, which is a *project-scoped* token: it can read
-and deploy the single project it was minted for, and project creation comes
-back `403 You don't have permission to create the project`. That is why the
-four projects below are still empty. Mint one at
-https://vercel.com/account/settings/tokens with its scope set to the owning
-team, or create the five projects by hand through the dashboard (route **a**)
-and then run `pnpm provision --verify-only`.
+**The token needs the team in scope, and you cannot tell from looking at it.**
+The token that ships in the build environment can read and deploy
+offer-decoder and nothing else — project creation returns `403 You don't have
+permission to create the project`. A second token from the same account, with
+the same `vcp_` prefix, creates projects fine. So the prefix tells you nothing;
+only the call does. Mint one at https://vercel.com/account/settings/tokens with
+its scope set to the owning team. If a token is refused, `pnpm provision` says
+so on the first attempt and names the fix, and the fallback is always to create
+the projects by hand through the dashboard (route **a**) and then run
+`pnpm provision --verify-only`.
 
 **`DATABASE_URL` cannot be copied off the offer-decoder project.** It was
 written there as a `sensitive` variable, and Vercel never returns the value of
@@ -224,21 +241,30 @@ works: build READY, `/api/health` still `"database": true`, homepage 200. Worth
 knowing from that run — the `bom1` region in `vercel.json` was accepted, so the
 Hobby-plan region warning above did not bite.
 
-**The other four are not created yet, and it is a permissions wall, not a
-to-do.** Both halves of it are described under route **c**: the token in the
-environment cannot create projects, and the database string cannot be read back
-off the project that has it. Give `pnpm provision` a team-scoped token and the
-Supabase string and it finishes this item in one command.
+**All five are now deployed, and `pnpm provision` is what did it.** Each was
+created from the API, given the root directory and the outside-files flag, sent
+the shared `DATABASE_URL`, deployed from `main`, and then checked by running a
+real job through it rather than by reading a health flag.
+
+Two things that run learned, both now fixed in the script:
+
+- `/v13/deployments` rejects `owner/name` in `gitSource` and wants the numeric
+  `repoId`.
+- Vercel will not convert an environment variable between types in place. A
+  variable created `sensitive` returns 400 on any PATCH that says `encrypted`;
+  it has to be deleted and recreated. offer-decoder's `DATABASE_URL` was
+  converted that way, so all five now hold it as `encrypted` and none of them
+  strand the next person the way the original did.
 
 **Record the URLs here when you have them:**
 
-| App | Production URL |
-| --- | --- |
-| offer-decoder | https://redesigned-system-offer-decoder.vercel.app |
-| ledger | |
-| uptime | |
-| freelancer-kit | |
-| admin | |
+| App | Production URL | Verified with |
+| --- | --- | --- |
+| offer-decoder | https://redesigned-system-offer-decoder.vercel.app | a real offer letter decoded |
+| ledger | https://redesigned-system-ledger.vercel.app | `fixtures/statement-hdfc.csv` parsed and categorised |
+| uptime | https://redesigned-system-uptime.vercel.app | github.com and vercel.com checked live |
+| freelancer-kit | https://redesigned-system-freelancer-kit.vercel.app | an inter-state IGST invoice generated |
+| admin | https://redesigned-system-admin.vercel.app | signed in, `Postgres`, all four probes' runs visible |
 
 ---
 
@@ -386,29 +412,50 @@ once, not for your situation" — more useful, and still true.
 
 ---
 
-## 9. Two claims I could not verify from this machine
+## 9. Two claims that could not be verified from the build machine — now both checked
 
-Both are in the code and both are tested against recorded or local data. Neither
-could be confirmed against the live internet, because outbound requests from the
-build environment go through a filtering proxy that returns 403 for most hosts
-and terminates TLS with its own certificate.
+Both are in the code and both were tested against recorded or local data. The
+build environment could not confirm either against the live internet, because
+its outbound requests go through a filtering proxy that returns 403 for most
+hosts and terminates TLS with its own certificate. **Both have now been run
+from the deployed app instead.** One passed and one did not.
 
-**a. RDAP domain expiry (`apps/uptime`).** `https://rdap.org` returned 403 from
-here. The parsing is tested against realistic RDAP payloads, and the failure
-path (registry does not publish expiry → report "unknown") is tested. But
-**before you post the uptime launch content, run one live check against a real
-domain and confirm a real expiry date comes back.** The launch post claims this
-works. If it does not, the fix is likely a different RDAP base — set
-`RDAP_BASE_URL` to a registry endpoint directly.
+**a. RDAP domain expiry (`apps/uptime`) — checked live, and it is half broken.**
+Run against the deployed app, not the build sandbox:
 
-**b. Live TLS against real hosts.** Certificate reading is tested against local
-HTTPS servers with three generated certificates (valid, near-expiry,
-wrong-hostname), and a raw handshake to a real host worked from a plain node
-process. Inside the app the proxy substituted its own certificate, so the
-end-to-end path against the public internet is unproven. Run one check against
-a domain whose expiry date you know.
+| What was tried | Result |
+| --- | --- |
+| default `https://rdap.org/domain` from Vercel | `403` — reported as "the registry did not answer over RDAP (403)" |
+| `RDAP_BASE_URL=https://rdap.verisign.com/com/v1/domain`, same app, same domain | real answer: registrar MarkMonitor, expiry 2026-10-09, three statuses, `source: "rdap"` |
 
-Neither is a suspected bug. Both are unverified, and I would rather say so.
+So the **parsing is fine and the bootstrap is not**. `rdap.org` is a redirector,
+and it 403s from Vercel's network — the earlier 403 was blamed on the build
+environment's filtering proxy, and that was the wrong conclusion; it reproduces
+in production. Point the app at an authoritative registry and a real expiry
+date comes straight back.
+
+**Do not just set `RDAP_BASE_URL` and call it done.** That variable is a single
+base for every lookup, and the Verisign endpoint above serves `.com`/`.net`
+only. Set it globally and a `.in` domain — the audience this probe is aimed at —
+gets a 404, which the code reports as *"No RDAP record. The domain may be
+unregistered."* That is a confident, wrong sentence about somebody's live
+domain, and it is worse than the honest failure it replaces. The diagnostic
+variable was removed from the project after this test for exactly that reason.
+
+The real fix is per-TLD bootstrap: read IANA's registry
+(`https://data.iana.org/rdap/dns.json`), pick the RDAP base for the domain's
+TLD, cache it. Roughly thirty lines in `apps/uptime/lib/checks.ts` around the
+`base` on line 448. Until that is done, the uptime launch post must not claim
+domain-expiry monitoring works — the TLS half does, the domain half does not.
+
+**b. Live TLS against real hosts — confirmed working.** A check from the
+deployed app against `github.com` returned the real certificate: issuer Sectigo
+Limited, subject `github.com`, `hostnameMatches: true`, alt names
+`github.com`/`www.github.com`, valid to 2026-11-29, 86 days remaining. Nothing
+was substituted and nothing was guessed. This claim is safe to make publicly.
+
+One of these is now a known bug with a known cause and a known fix, and the
+other is settled. That is what running them live bought.
 
 ---
 
@@ -446,8 +493,8 @@ Actions:
 | Secret | Value |
 | --- | --- |
 | `CRON_SECRET` | the same value you set in the Vercel projects |
-| `UPTIME_URL` | the deployed uptime app, e.g. `https://uptime.vercel.app` |
-| `FREELANCER_URL` | the deployed freelancer app |
+| `UPTIME_URL` | `https://redesigned-system-uptime.vercel.app` |
+| `FREELANCER_URL` | `https://redesigned-system-freelancer-kit.vercel.app` |
 
 Then run it once by hand (Actions → Scheduled checks → Run workflow) to confirm
 a 200 before trusting the schedule. The endpoints are idempotent and both are

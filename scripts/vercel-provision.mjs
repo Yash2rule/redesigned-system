@@ -13,12 +13,13 @@
  *   ... --verify-only                # skip create/env/deploy, just check health
  *   ... --sensitive                  # write env vars Vercel can never read back
  *
- * THE TOKEN MATTERS. A project-scoped token (`vcp_...`) can read and deploy
- * the one project it was minted for and nothing else — project creation comes
- * back 403 "You don't have permission to create the project". Mint an account
- * or team token at https://vercel.com/account/settings/tokens with its scope
- * set to the team that owns the projects. The preflight below says so out loud
- * rather than failing four times in a row.
+ * THE TOKEN'S SCOPE MATTERS, AND YOU CANNOT READ IT OFF THE TOKEN. A token
+ * narrowed to a single project answers 403 "You don't have permission to
+ * create the project" on everything here except that one project. The `vcp_`
+ * prefix does NOT tell you which kind you have — two `vcp_` tokens were tried
+ * against this account and one could create projects while the other could
+ * not. The only way to know is to make the call, so the 403 handler below
+ * explains the fix rather than repeating the status code four times.
  *
  * ENV VARS ARE WRITTEN AS `encrypted`, NOT `sensitive`, ON PURPOSE. Vercel
  * never returns the value of a `sensitive` variable — not to the dashboard,
@@ -140,14 +141,10 @@ function tokenCannotCreate(missing) {
       : `This token cannot create projects, and ${missing.length} of them do not exist yet:`,
     ...missing.map((name) => `  - ${name}`),
     "",
-    TOKEN.startsWith("vcp_")
-      ? "The token starts with `vcp_`, which is a PROJECT-scoped token: it can read"
-      : "Project creation came back 403: this token's scope or role does not cover",
-    TOKEN.startsWith("vcp_")
-      ? "and deploy the single project it was minted for, and nothing else."
-      : "creating projects in this team.",
+    "Project creation came back 403, so this token is narrowed to the projects",
+    "it already has — the prefix does not tell you that, only the call does.",
     "",
-    "Mint an account or team token instead:",
+    "Mint one with the team in scope instead:",
     "  https://vercel.com/account/settings/tokens  →  Scope: the owning team",
     "",
     "Or create the projects by hand once (Vercel dashboard → Add New → Project),",
@@ -230,13 +227,26 @@ async function upsertEnv(project, key, val) {
     return;
   }
   if (existing) {
-    const { status } = await api("PATCH", `/v10/projects/${project.id}/env/${existing.id}`, {
+    const patch = await api("PATCH", `/v10/projects/${project.id}/env/${existing.id}`, {
       value: val,
       type: ENV_TYPE,
       target: ["production", "preview"],
     });
-    console.log(`  ${status < 300 ? "updated" : `FAILED (${status}) to update`} ${key}`);
-    return;
+    if (patch.status < 300) {
+      console.log(`  updated ${key}`);
+      return;
+    }
+    // Vercel will not convert a variable between types in place, so a var
+    // that was created `sensitive` 400s on any PATCH that says `encrypted`.
+    // Replacing it is the only way across, and is why this is not simply an
+    // error: the whole point of the script is to stop `sensitive` from
+    // stranding the next person who needs to read the value back.
+    console.log(`  ${key} exists as \`${existing.type}\` and will not convert in place — replacing it`);
+    const removed = await api("DELETE", `/v9/projects/${project.id}/env/${existing.id}`);
+    if (removed.status >= 300) {
+      console.log(`  FAILED (${removed.status}) to remove ${key}: ${JSON.stringify(removed.body)}`);
+      return;
+    }
   }
   const { status, body: created } = await api("POST", `/v10/projects/${project.id}/env`, {
     key,
@@ -244,7 +254,7 @@ async function upsertEnv(project, key, val) {
     type: ENV_TYPE,
     target: ["production", "preview"],
   });
-  console.log(`  ${status < 300 ? "added" : `FAILED (${status}) to add ${JSON.stringify(created)}`} ${key}`);
+  console.log(`  ${status < 300 ? "set" : `FAILED (${status}) to set ${JSON.stringify(created)}`} ${key}`);
 }
 
 async function deploy(project, app) {
