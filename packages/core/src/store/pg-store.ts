@@ -95,8 +95,7 @@ export class PgStore implements Store {
   readonly kind = "postgres" as const;
 
   private readonly url: string;
-  // Assigned by connect(), which the constructor calls; reassigned when a
-  // missed deadline retires a poisoned pool.
+  // Assigned by connect(), which the constructor calls.
   private sql!: postgres.Sql;
   private db!: PostgresJsDatabase<typeof t>;
   private migrated: Promise<void> | null = null;
@@ -116,17 +115,12 @@ export class PgStore implements Store {
    */
   private connect(): void {
     this.sql = postgres(this.url, {
-      // One connection per process, not three.
-      //
-      // The budget is the whole deployment's, not this process's: five apps,
-      // several routes each, and a fresh instance per concurrent request, all
-      // against one pooler whose free tier allows a couple of dozen server
-      // connections. At three apiece that ceiling arrives quickly, and when it
-      // does the pooler does not refuse the connection — it queues it, so the
-      // symptom is a query that never returns rather than an error that says
-      // what happened. Nothing here fans out inside a single request, so the
-      // extra two bought nothing anyway.
-      max: 1,
+      // Three, because the dashboard issues four reads at once and one
+      // connection makes them queue behind each other. The connection budget
+      // is the whole deployment's rather than this process's — five apps
+      // against one pooler — so this stays as small as the busiest page can
+      // tolerate.
+      max: 3,
       // Give an idle connection back quickly. An instance that is about to be
       // frozen between requests should be holding as little as possible.
       idle_timeout: 10,
@@ -156,43 +150,28 @@ export class PgStore implements Store {
    * throughout, because on Vercel each route is a separate process with its
    * own pool, and the ones being hit often enough never went cold.
    *
-   * Losing the race does not cancel the underlying query, so a pool that has
-   * missed a deadline is assumed poisoned and replaced. That makes the failure
-   * both fast and self-healing: one request fails with a real error, the next
-   * one reconnects.
+   * The deadline only bounds the wait; it deliberately does not try to repair
+   * anything. An earlier version replaced the pool whenever a call timed out,
+   * which read well and was wrong: the pool is shared, the dashboard runs four
+   * reads at once, and tearing it down under the other three turned one slow
+   * query into four failed ones. Failing fast with an honest error and letting
+   * the platform retire the instance is the boring option and the correct one.
    */
   private async guard<T>(run: () => Promise<T>): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let timedOut = false;
     try {
       return await Promise.race([
         run(),
         new Promise<never>((_, reject) => {
-          timer = setTimeout(() => {
-            timedOut = true;
-            reject(new Error(`Database did not respond within ${QUERY_DEADLINE_MS / 1000}s.`));
-          }, QUERY_DEADLINE_MS);
+          timer = setTimeout(
+            () => reject(new Error(`Database did not respond within ${QUERY_DEADLINE_MS / 1000}s.`)),
+            QUERY_DEADLINE_MS,
+          );
         }),
       ]);
-    } catch (error) {
-      // Only a missed deadline means the pool itself is suspect. An ordinary
-      // query error — a constraint violation, bad input — came back over a
-      // healthy connection, and throwing that connection away would turn every
-      // application-level mistake into a reconnect.
-      if (timedOut) this.recycle();
-      throw error;
     } finally {
       if (timer) clearTimeout(timer);
     }
-  }
-
-  /** Retire a pool that missed a deadline so the next call reconnects. */
-  private recycle(): void {
-    const stale = this.sql;
-    this.connect();
-    // Detached on purpose: the point is to stop using it, not to wait on a
-    // socket that has already proved it will not answer.
-    void stale.end({ timeout: 0 }).catch(() => {});
   }
 
   /** Idempotent, run-once-per-process DDL. Cheaper than shipping a migrator. */
