@@ -7,9 +7,11 @@ committed.
 **Push status: pushed.** The branch is on GitHub — item 0 has the link. No
 pull request has been opened; that is your call.
 
-**Deployment status: all five are live, on one Supabase database, verified by
-use rather than by health check.** URLs are in item 3. Items 1, 2 and 3 are
-done; item 9a now has an answer and it is not the one that was expected.
+**Deployment status: all five live and current, on one Supabase database,
+verified by use rather than by health check.** URLs are in item 3. Items 1, 2,
+3, 7b and 11's mechanism are done, item 9a turned out to be a real bug and is
+fixed, and validation now decides itself — see 3b. What is left needs either
+traffic or a decision from you, not building.
 
 Before anything else, prove it runs on your machine:
 
@@ -317,27 +319,20 @@ pooler, and a failed migration no longer caches itself as a promise that never
 settles — which is what made the failure total and identical rather than
 intermittent, and why a redeploy appeared to fix it every time.
 
-**Drift to clear, and one thing to clear urgently.** Iterating on this
-exhausted Vercel's free limit of 100 API-created deployments in a day, and
-Git-triggered deployments share that limit, so the merge to `main` did not
-deploy either. The quota resets 2026-09-05 15:28 UTC. Until something
-deploys after that:
+**Cleared, 5 September.** All five projects redeployed from `main` once the
+quota reset; every one of them is now current and nothing is behind. The
+diagnostic endpoint is gone — `/api/diag` returns 404 — and the dashboard ran
+ten consecutive loads at about half a second each, so the parallel-reads fix
+holds on `main` as it did on the branch.
 
-| Project | Live build | Behind by |
-| --- | --- | --- |
-| offer-decoder | `8f56751` | nothing — current |
-| admin | `fab4d39` | the diagnostic-endpoint removal |
-| ledger, uptime, freelancer-kit | `ce0f030` | the last two store commits |
-
-All five were re-tested on those builds and all five are healthy — the fault
-was only ever in the dashboard's parallel reads, which `fab4d39` fixes.
-
-**The urgent one: `/api/diag` is still live on the admin project.** Its
-removal only ever reached a preview deployment. It is gated behind the admin
-cookie, so it is not open to the internet, but it returns internal error text
-and stack frames and it should not outlive the bug it was written for. The
-next deployment of `main` removes it. If that slips, delete it by hand rather
-than leaving it.
+**One gap that rollout found.** `CRON_SECRET` had only ever been set on the
+uptime and freelancer-kit projects, because those were the two with crons at
+the time. The decision endpoint added later lives on `admin`, which had never
+been given it, so it answered 401 to its own scheduler — a nightly job that
+would have failed silently every night while looking correctly configured from
+every angle except the one that mattered. It is set on `admin` now. Worth
+remembering when the next scheduled endpoint lands on a project that does not
+have one yet.
 
 ---
 
